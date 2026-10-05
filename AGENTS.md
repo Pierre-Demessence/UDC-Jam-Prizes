@@ -42,7 +42,8 @@ the socket address. Run typecheck, lint, test and build before considering work 
 - `data/` — the SQLite file at runtime; gitignored, never committed.
 - `index.html` — Vite HTML entry; `%APP_NAME%` is replaced from `brand.json` at build time.
 - `docs/` — `backlog.md` (everything not done), `decisions.md` (non-obvious
-  decisions and why), `plans/` (work in progress).
+  decisions and why), `deployment.md` (the deployed shape, its secrets and restores; update it when any
+  of those change), `plans/` (work in progress).
 - `k8s/prod/` — the deployed manifests (Deployment, Service, Ingress, PVC, ExternalSecret) that
   ArgoCD syncs. `.github/workflows/deploy.yml` builds the image and pins its tag in `deployment.yaml`;
   the ArgoCD `Application` that points at this path lives in the GitOps repository, not here.

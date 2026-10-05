@@ -85,12 +85,13 @@ Three things about the deployment are deliberate:
   without it is worthless.
 
 Checking a deployment: `kubectl -n jam-prizes-prod get pods` and
-`kubectl -n jam-prizes-prod logs deploy/jam-prizes`. A bad image goes back with
-`kubectl -n jam-prizes-prod rollout undo deploy/jam-prizes`, though a schema change does not roll back
-with it (see [docs/backlog.md](docs/backlog.md)).
+`kubectl -n jam-prizes-prod logs deploy/jam-prizes`. An image goes back by reverting the pin commit in
+`k8s/prod/deployment.yaml` — ArgoCD would undo a bare `rollout undo` at its next sync. Secrets,
+rollbacks and what a restore needs: [docs/deployment.md](docs/deployment.md).
 
 ## Docs
 
 - [docs/decisions.md](docs/decisions.md) — non-obvious decisions and why.
+- [docs/deployment.md](docs/deployment.md) — the deployed shape, its secrets and restores.
 - [docs/backlog.md](docs/backlog.md) — everything not done yet.
 - [AGENTS.md](AGENTS.md) — commands, layout and conventions for agents.
