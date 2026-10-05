@@ -24,7 +24,7 @@ filesystem forces a hosted SQL service (more accounts, more moving parts) and Ne
 a single user. Also rejected: **Vite + vanilla TypeScript**, the template's default, because the
 public gallery and the admin form need real component state.
 
-## Everything comes from the page's JSON-LD, price included
+## Metadata from the JSON-LD, the list price from the page's own product data
 
 The page carries a schema.org `Product` in an `application/ld+json` block: `name`, `image`,
 `description`, `brand.name`, and an `offers` object with `price` and `priceCurrency`. Unity serves that
@@ -32,9 +32,21 @@ same markup to a plain HTTP client, so `POST /api/metadata` is one fetch and one
 browser, no internal API. Category is the exception: it is not in the markup, so it comes from the page
 path (`/packages/tools/gui/…` → `tools/gui`) and stays editable in the form.
 
+The price needs one more source: `offers.price` is the **discounted** price, so a prize imported during
+a sale would be valued at the price of the week. The page also embeds its own copy of the product, keyed
+by Unity's asset id, and that copy holds the list price beside the sale price. Its amounts are in the
+visitor's own currency, which a server has no say in, so the entry is read as a **ratio** — a ratio
+holds whatever the currency — and applied to the offer's price: 4.87 USD at 29.90/4.48 becomes 32.50,
+the list price, and the catalogue stays in USD. Reading the entry means locating `"<id>":{"id":"<id>"`
+and matching braces to its end (a few kB out of an 870 kB page, no second request).
+
+Anything unexpected — no entry, another kind of item, a missing or zero amount, markup that changed
+shape — leaves the offer's price as it stands, so a parse failure degrades to the old behaviour rather
+than to no price or a wrong one. `scripts/capture-fixtures.mjs` trims that entry into the test fixture
+for the discounted page, so both prices stay covered by a test.
+
 The brainstorm concluded the opposite — that the price was only available client-side. Checking a live
-page settled it: `offers.price` is `"32.50"` in the served HTML. The price therefore autofills like the
-rest, and remains an ordinary editable field for a page that carries no offer.
+page settled it: `offers.price` is present in the served HTML, and so is the list price.
 
 ## `better-sqlite3` rather than `node:sqlite`
 

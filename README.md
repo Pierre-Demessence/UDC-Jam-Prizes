@@ -57,7 +57,8 @@ client and the API, which is what a deployment would run.
   link whether it was added, already there, or unreadable. Key values are encrypted on the way in and
   decrypted for the admin screen only; they never leave the server in a public response.
 - The price is an ordinary field: read from the page when it offers one, editable, and allowed to stay
-  empty when the page has none.
+  empty when the page has none. A sale price is not what a prize is worth, so the page's list price is
+  the one that fills the form — in USD, however the page happens to localise its own amounts.
 
 The admin side can also be pinned to known addresses: set `ADMIN_IP_ALLOWLIST` to a comma-separated
 list of addresses or CIDR blocks, and everything under `/api/session`, `/api/admin/*` and

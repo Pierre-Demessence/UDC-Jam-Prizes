@@ -90,6 +90,82 @@ function offerPrice(offers: unknown): { currency: string | null; priceCents: num
   };
 }
 
+/** The JSON object that starts at `from`, found by counting braces outside strings. */
+function jsonObjectAt(text: string, from: number): string | null {
+  let depth = 0;
+  let escaped = false;
+  let inString = false;
+
+  for (let index = from; index < text.length; index++) {
+    const char = text[index];
+    if (inString) {
+      if (escaped)
+        escaped = false;
+      else if (char === '\\')
+        escaped = true;
+      else if (char === '"')
+        inString = false;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = true;
+    }
+    else if (char === '{') {
+      depth++;
+    }
+    else if (char === '}') {
+      depth -= 1;
+      if (depth === 0)
+        return text.slice(from, index + 1);
+    }
+  }
+
+  return null;
+}
+
+/**
+ * The page embeds its own copy of the product, keyed by Unity's asset id, and
+ * that copy carries the sale price beside the list price. The JSON-LD offer has
+ * the sale price alone, so a prize imported during a sale would be valued at the
+ * price of the week.
+ *
+ * The two amounts in that entry are in the visitor's own currency, which a server
+ * has no say in, so they are used as a ratio rather than as a price: a ratio
+ * holds whatever the currency, and applying it to the offer's price lifts the USD
+ * sale price to the USD list price. Anything unexpected — no entry, another kind
+ * of item, a shape that changed, a free asset — returns nothing, and the offer's
+ * price stands as it is.
+ */
+function listToSaleRatio(html: string, assetId: string): number | null {
+  const marker = `"${assetId}":{"id":"${assetId}"`;
+  const markerAt = html.indexOf(marker);
+  const object = markerAt === -1 ? null : jsonObjectAt(html, html.indexOf('{', markerAt));
+  if (object === null)
+    return null;
+
+  try {
+    const entry = JSON.parse(object) as {
+      __typename?: unknown;
+      originalPrice?: { finalPrice?: unknown; originalPrice?: unknown };
+    };
+
+    // Only a product is priced this way; a bundle or a carousel card is not.
+    if (entry.__typename !== 'Product')
+      return null;
+
+    const list = Number.parseFloat(String(entry.originalPrice?.originalPrice ?? ''));
+    const sale = Number.parseFloat(String(entry.originalPrice?.finalPrice ?? ''));
+    if (!Number.isFinite(list) || !Number.isFinite(sale) || list <= 0 || sale <= 0)
+      return null;
+
+    return list / sale;
+  }
+  catch {
+    return null;
+  }
+}
+
 function findProduct(html: string): Record<string, unknown> {
   for (const match of html.matchAll(LD_JSON_BLOCK)) {
     let parsed: unknown;
@@ -144,7 +220,10 @@ export function parseAssetPage(html: string, pageUrl: string): AssetMetadata {
     throw new MetadataError('That page has no asset id, so the asset cannot be identified.');
 
   const image = firstImage(product.image);
-  const { currency, priceCents } = offerPrice(product.offers);
+  const offer = offerPrice(product.offers);
+  // The price the page offers is the sale price during a sale; the entry's ratio
+  // lifts it to the list price, which is what a donated prize is worth.
+  const ratio = listToSaleRatio(html, assetId);
 
   url.search = '';
   url.hash = '';
@@ -154,9 +233,11 @@ export function parseAssetPage(html: string, pageUrl: string): AssetMetadata {
     assetId,
     assetUrl: url.href,
     category: categoryFromPath(url),
-    currency: currency ?? DEFAULT_CURRENCY,
+    currency: offer.currency ?? DEFAULT_CURRENCY,
     imageUrl: image ? new URL(image, url).href : null,
-    priceCents,
     publisher: asNonEmptyString((product.brand as { name?: unknown } | undefined)?.name),
+    priceCents: offer.priceCents === null || ratio === null
+      ? offer.priceCents
+      : Math.round(offer.priceCents * ratio),
   };
 }

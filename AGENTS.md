@@ -34,8 +34,8 @@ known addresses. Run typecheck, lint, test and build before considering work don
   response shapes), `validate.ts` (input rules), `auth.ts` (session cookie + rate limits),
   `secrets.ts` (key encryption), `config.ts` (environment), `unity.ts` + `unity-fetch.ts` (reading an
   Asset Store page); `drizzle/` holds the generated SQL migrations.
-- `server/fixtures/` — a captured Asset Store page the parser tests run against; refresh it with
-  `node scripts/capture-fixtures.mjs`.
+- `server/fixtures/` — captured Asset Store pages the parser tests run against, one of them an asset on
+  sale; refresh with `node scripts/capture-fixtures.mjs [name]`.
 - `data/` — the SQLite file at runtime; gitignored, never committed.
 - `index.html` — Vite HTML entry; `%APP_NAME%` is replaced from `brand.json` at build time.
 - `docs/` — `backlog.md` (everything not done), `decisions.md` (non-obvious
