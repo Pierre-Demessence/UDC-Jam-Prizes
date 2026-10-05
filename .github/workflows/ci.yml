@@ -29,6 +29,9 @@ jobs:
         env:
           ADMIN_PASSWORD: ci-password
           SESSION_SECRET: ci-session-secret-long-enough
+          # Required at startup since key values are encrypted at rest; without
+          # it the server exits before it can answer.
+          KEY_ENCRYPTION_SECRET: ci-key-encryption-secret-not-a-real-value
         run: |
           npm start &
           for attempt in {1..20}; do
