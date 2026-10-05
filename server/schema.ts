@@ -5,7 +5,9 @@ import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
  *
  * `assetId` is Unity's own identifier, kept as text — it is a label, not a
  * quantity. `priceCents` is null when the price could not be read from the
- * asset page, which is expected: Unity renders it client-side.
+ * asset page, which is expected: Unity renders it client-side. `needed` is how
+ * many keys the jam's winners asked for, which is planning information and
+ * therefore never published.
  */
 export const assets = sqliteTable('assets', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -16,6 +18,7 @@ export const assets = sqliteTable('assets', {
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   currency: text('currency').notNull().default('USD'),
   imageUrl: text('image_url'),
+  needed: integer('needed').notNull().default(0),
   notes: text('notes'),
   priceCents: integer('price_cents'),
   publisher: text('publisher'),
@@ -48,7 +51,8 @@ export const contacts = sqliteTable('contacts', {
 
 /**
  * A donated key. Private, and a secret: `keyValue` holds AES-256-GCM ciphertext
- * (see secrets.ts), never the key itself. Random initialisation means the same
+ * (see secrets.ts), never the key itself, and a key is nothing more than stock
+ * for its prize — no status, no recipient. Random initialisation means the same
  * key encrypts differently every time, so the separate, deterministic
  * `keyFingerprint` is what recognises a key that was pasted twice. It is
  * nullable because rows written before encryption existed are backfilled at
@@ -57,20 +61,12 @@ export const contacts = sqliteTable('contacts', {
  */
 export const keys = sqliteTable('keys', {
   id: integer('id').primaryKey({ autoIncrement: true }),
-  // Kept for rows written before a key was only ever available or sent; nothing
-  // reads or writes it, `sentAt` is the day the key reached its winner.
-  assignedAt: integer('assigned_at', { mode: 'timestamp_ms' }),
-  assignedTo: text('assigned_to'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   keyFingerprint: text('key_fingerprint').unique(),
   keyValue: text('key_value').notNull(),
-  sentAt: integer('sent_at', { mode: 'timestamp_ms' }),
   assetId: integer('asset_id')
     .notNull()
     .references(() => assets.id, { onDelete: 'cascade' }),
-  status: text('status', { enum: ['available', 'sent'] })
-    .notNull()
-    .default('available'),
 }, table => [
   // See contacts: the foreign key is not indexed by SQLite, and the gallery
   // counts an asset's keys on every page.

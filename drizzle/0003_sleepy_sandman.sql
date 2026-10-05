@@ -1,0 +1,1 @@
+ALTER TABLE `assets` ADD `needed` integer DEFAULT 0 NOT NULL;

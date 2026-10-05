@@ -161,16 +161,28 @@ last in **both** directions, because an unpriced asset is not "the cheapest", an
 name so the order never wobbles between renders. The column shows a ▲/▼ glyph and carries `aria-sort`,
 so the direction is never colour alone.
 
-## A key is available or sent
+## A key is just stock
 
-A donated key is either in stock or already with a winner, so those are the only two states. The two
-others were dropped: "assigned" duplicated "sent" with a second timestamp nobody looked at, and
-"revoked" was never used, because a jam hands keys out rather than takes them back. Marking a key sent
-requires a winner, so no key can claim to have gone somewhere without saying where.
+A key is a value in stock for a prize, and nothing else: it is not assigned to anyone, it has no status,
+and the app does not record who received it. Those fields went once the *Needed* field took over the
+planning — knowing how many keys a prize requires and how many are stored is what the delivery work
+needs, and the recipient list lived in a spreadsheet nobody consulted again. They are gone from the
+table too, so the shape of a key is the shape of the work.
 
-`keys.assigned_at` stays in the schema although nothing writes it any more (`docs/backlog.md` tracks
-dropping it): `sent_at` is the only date this model needs, but dropping the column would discard the
-dates recorded on rows written while the old status existed.
+## A prize says how many keys it needs
+
+At the end of a jam the demand is known before any key is: winners say which assets they want, the
+publishers are asked for that many keys, and the keys arrive later. `assets.needed` records that
+request, typed straight into the admin table's own field rather than through the edit form, because it
+is entered for a whole batch of prizes at once.
+
+A row is tinted and marked with a glyph only when `needed` is greater than zero: publishers sometimes
+send keys before anything is requested, and an unasked-for prize should not look like a problem. The
+mark compares the two counts directly — as many keys stored as asked for means covered — so the row
+needs no third state. The glyph carries the meaning as well as the tint, since short and covered are
+red and green, the pair the admin cannot tell apart by colour; the counts live in its tooltip.
+
+`needed` is planning information and stays on the admin side; the public payload has no such field.
 
 ## One switch instead of a router
 

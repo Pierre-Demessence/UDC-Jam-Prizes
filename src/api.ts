@@ -1,6 +1,6 @@
 import type { ImportOutcome } from '../server/import-assets.ts';
 import type { AdminAsset, CatalogueTotals, PublicAsset } from '../server/payloads.ts';
-import type { AssetInput, ContactInput, KeyStatusInput } from '../server/validate.ts';
+import type { AssetInput, ContactInput } from '../server/validate.ts';
 
 export interface Catalogue {
   assets: PublicAsset[];
@@ -112,12 +112,13 @@ export const api = {
     `/api/admin/assets/${id}/contact`,
     json(input, 'PUT'),
   ),
+  /** How many keys the winners asked for; the admin table edits it in place. */
+  setNeeded: (id: number, needed: number) => request<{ asset: AdminAsset }>(
+    `/api/admin/assets/${id}/needed`,
+    json({ needed }, 'PUT'),
+  ),
   updateAsset: (id: number, input: AssetInput) => request<{ asset: AdminAsset }>(
     `/api/admin/assets/${id}`,
-    json(input, 'PATCH'),
-  ),
-  updateKey: (id: number, keyId: number, input: KeyStatusInput) => request<{ asset: AdminAsset }>(
-    `/api/admin/assets/${id}/keys/${keyId}`,
     json(input, 'PATCH'),
   ),
 };

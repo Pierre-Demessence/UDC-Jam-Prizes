@@ -32,12 +32,10 @@ export interface PublicCatalogue {
   totals: CatalogueTotals;
 }
 
+/** One stored key. A key carries nothing else now: no status, no recipient. */
 export interface AdminKey {
   id: number;
-  assignedTo: string | null;
   keyValue: string;
-  sentAt: string | null;
-  status: string;
 }
 
 export interface AdminContact {
@@ -49,12 +47,10 @@ export interface AdminAsset extends PublicAsset {
   contact: AdminContact | null;
   createdAt: string;
   keys: AdminKey[];
+  /** How many keys the winners asked for. Private: it is planning, not catalogue data. */
+  needed: number;
   notes: string | null;
   updatedAt: string;
-}
-
-function toIso(value: Date | null): string | null {
-  return value === null ? null : value.toISOString();
 }
 
 /**
@@ -90,14 +86,12 @@ export function toAdminAsset(asset: Asset, contact: Contact | null, keys: Key[],
     ...toPublicAsset(asset),
     contact: contact === null ? null : { contactNotes: contact.contactNotes, discordHandle: contact.discordHandle },
     createdAt: asset.createdAt.toISOString(),
+    needed: asset.needed,
     notes: asset.notes,
     updatedAt: asset.updatedAt.toISOString(),
     keys: keys.map(key => ({
       id: key.id,
-      assignedTo: key.assignedTo,
       keyValue: readableKeyValue(key.keyValue, secret),
-      sentAt: toIso(key.sentAt),
-      status: key.status,
     })),
   };
 }

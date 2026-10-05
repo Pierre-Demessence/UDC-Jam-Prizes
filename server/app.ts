@@ -30,7 +30,7 @@ import {
   publicCatalogue,
   saveContact,
   updateAsset,
-  updateKey,
+  updateNeeded,
 } from './repository.ts';
 import { assertAssetStoreUrl, fetchAssetPage } from './unity-fetch.ts';
 import { MetadataError, parseAssetPage } from './unity.ts';
@@ -39,8 +39,8 @@ import {
   parseAssetInput,
   parseContactInput,
   parseId,
-  parseKeyStatusInput,
   parseKeyValues,
+  parseNeededInput,
   parseUrls,
 } from './validate.ts';
 
@@ -281,6 +281,25 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
     return c.body(null, 204);
   });
 
+  /** How many keys the winners asked for, as typed in the admin table. */
+  app.put('/api/admin/assets/:id/needed', async (c) => {
+    const denied = requireAdmin(c);
+    if (denied)
+      return denied;
+
+    const id = parseId(c.req.param('id'));
+    if (id === null)
+      return c.json({ error: 'Unknown asset.' }, 404);
+
+    const input = parseNeededInput(await readJson(c));
+    if (!input.ok)
+      return c.json({ error: input.error }, 400);
+
+    const asset = updateNeeded(db, id, input.value.needed, keyEncryptionSecret);
+
+    return asset === null ? c.json({ error: 'Unknown asset.' }, 404) : c.json({ asset });
+  });
+
   app.put('/api/admin/assets/:id/contact', async (c) => {
     const denied = requireAdmin(c);
     if (denied)
@@ -320,23 +339,6 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
       asset: adminAsset(db, id, keyEncryptionSecret),
       skipped,
     }, 201);
-  });
-
-  app.patch('/api/admin/assets/:id/keys/:keyId', async (c) => {
-    const denied = requireAdmin(c);
-    if (denied)
-      return denied;
-
-    const id = parseId(c.req.param('id'));
-    const keyId = parseId(c.req.param('keyId'));
-    if (id === null || keyId === null || adminAsset(db, id, keyEncryptionSecret) === null)
-      return c.json({ error: 'Unknown key.' }, 404);
-
-    const input = parseKeyStatusInput(await readJson(c));
-    if (!input.ok)
-      return c.json({ error: input.error }, 400);
-
-    return c.json({ asset: updateKey(db, id, keyId, input.value, keyEncryptionSecret) });
   });
 
   app.delete('/api/admin/assets/:id/keys/:keyId', (c) => {

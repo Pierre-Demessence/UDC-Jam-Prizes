@@ -141,7 +141,7 @@ export function Admin() {
   }
 
   return (
-    <div className="page">
+    <div className="page page-wide">
       <header className="site-header">
         <div>
           <p className="eyebrow">Admin</p>
@@ -226,6 +226,15 @@ export function Admin() {
                         setDraft({ editing: asset, metadata: null });
                       }}
                       onToggleKeys={id => setOpenPanel(openPanel === id ? null : id)}
+                      onSetNeeded={async (asset, needed) => {
+                        try {
+                          mergeAsset((await api.setNeeded(asset.id, needed)).asset);
+                        }
+                        catch (cause) {
+                          setNotice(cause instanceof Error ? cause.message : String(cause));
+                          await reload();
+                        }
+                      }}
                       openKeys={openPanel}
                     />
                   )}

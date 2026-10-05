@@ -105,13 +105,13 @@ describe('the private tables', () => {
     expect(handle.db.select().from(keys).all()).toHaveLength(2);
   });
 
-  it('defaults a key to available and tracks the assignment', () => {
+  it('stores a key whose only content is its value', () => {
     const asset = addAsset();
     const key = handle.db.insert(keys).values({ assetId: asset.id, keyValue: 'ABCD-1234-EFGH' }).returning().get();
 
-    expect(key.status).toBe('available');
-    expect(key.assignedTo).toBeNull();
-    expect(key.assignedAt).toBeNull();
+    expect(key.keyValue).toBe('ABCD-1234-EFGH');
+    expect(key.createdAt).toBeInstanceOf(Date);
+    expect(Object.keys(key).sort()).toEqual(['assetId', 'createdAt', 'id', 'keyFingerprint', 'keyValue']);
   });
 });
 

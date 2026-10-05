@@ -109,7 +109,8 @@ describe('the admin gate', () => {
       ['/api/admin/assets/1', { method: 'DELETE' }],
       ['/api/admin/assets/1/contact', { method: 'PUT' }],
       ['/api/admin/assets/1/keys', { method: 'POST' }],
-      ['/api/admin/assets/1/keys/1', { method: 'PATCH' }],
+      ['/api/admin/assets/1/keys/1', { method: 'DELETE' }],
+      ['/api/admin/assets/1/needed', { method: 'PUT' }],
       ['/api/metadata', { method: 'POST' }],
     ];
 
@@ -254,6 +255,18 @@ describe('the keys behind a prize', () => {
     return { assetId: asset.id as number, keyId: body.asset.keys[0].id };
   }
 
+  it('removes one key and leaves the others alone', async () => {
+    const cookie = await signIn();
+    const { assetId, keyId } = await assetWithKeys(cookie);
+
+    const response = await app.request(`/api/admin/assets/${assetId}/keys/${keyId}`, { headers: { cookie }, method: 'DELETE' });
+    const body = await response.json() as { asset: { keys: { keyValue: string }[] } };
+
+    expect(response.status).toBe(200);
+    expect(body.asset.keys.map(key => key.keyValue)).toEqual(['KEY-2']);
+    expect(handle.sqlite.prepare('select count(*) as n from keys').get()).toEqual({ n: 1 });
+  });
+
   it('stores pasted keys and skips the ones already there', async () => {
     const cookie = await signIn();
     const asset = await addAsset(cookie);
@@ -325,47 +338,47 @@ describe('the keys behind a prize', () => {
     expect(body.assets.find(a => a.id === assetId)?.keys[0].keyValue).toMatch(/unreadable/);
   });
 
-  it('marks a key as sent to a winner', async () => {
+  it('stores how many keys the winners asked for, without publishing it', async () => {
     const cookie = await signIn();
-    const { assetId, keyId } = await assetWithKeys(cookie);
+    const asset = await addAsset(cookie);
 
-    const response = await app.request(`/api/admin/assets/${assetId}/keys/${keyId}`, {
-      body: JSON.stringify({ assignedTo: 'Winner One', status: 'sent' }),
+    const response = await app.request(`/api/admin/assets/${asset.id}/needed`, {
+      body: JSON.stringify({ needed: 4 }),
       headers: { 'content-type': 'application/json', cookie },
-      method: 'PATCH',
-    });
-    const body = await response.json() as { asset: { keys: { assignedTo: string | null; sentAt: string | null }[] } };
-    const key = body.asset.keys[0];
-
-    expect(key.sentAt).not.toBeNull();
-    expect(key.assignedTo).toBe('Winner One');
-  });
-
-  it('refuses sending a key with no winner', async () => {
-    const cookie = await signIn();
-    const { assetId, keyId } = await assetWithKeys(cookie);
-    const response = await app.request(`/api/admin/assets/${assetId}/keys/${keyId}`, {
-      body: JSON.stringify({ status: 'sent' }),
-      headers: { 'content-type': 'application/json', cookie },
-      method: 'PATCH',
+      method: 'PUT',
     });
 
-    expect(response.status).toBe(400);
+    expect(((await response.json()) as { asset: { needed: number } }).asset.needed).toBe(4);
+
+    // Planning information: the public side has no such field at all.
+    const publicBody = await (await app.request('/api/assets')).json() as { assets: Record<string, unknown>[] };
+    expect(publicBody.assets[0]).not.toHaveProperty('needed');
   });
 
-  it('refuses a status it does not know, including the ones the app dropped', async () => {
+  it('refuses a number of keys that is not a whole, sane count', async () => {
     const cookie = await signIn();
-    const { assetId, keyId } = await assetWithKeys(cookie);
+    const asset = await addAsset(cookie);
 
-    for (const status of ['eaten', 'assigned', 'revoked']) {
-      const response = await app.request(`/api/admin/assets/${assetId}/keys/${keyId}`, {
-        body: JSON.stringify({ assignedTo: 'Winner One', status }),
+    for (const needed of [-1, 1.5, 'many', 1000]) {
+      const response = await app.request(`/api/admin/assets/${asset.id}/needed`, {
+        body: JSON.stringify({ needed }),
         headers: { 'content-type': 'application/json', cookie },
-        method: 'PATCH',
+        method: 'PUT',
       });
 
-      expect(response.status, status).toBe(400);
+      expect(response.status, String(needed)).toBe(400);
     }
+  });
+
+  it('refuses to set a request on a prize that does not exist', async () => {
+    const cookie = await signIn();
+    const response = await app.request('/api/admin/assets/9999/needed', {
+      body: JSON.stringify({ needed: 1 }),
+      headers: { 'content-type': 'application/json', cookie },
+      method: 'PUT',
+    });
+
+    expect(response.status).toBe(404);
   });
 
   it('stores the contact of the author without publishing it', async () => {

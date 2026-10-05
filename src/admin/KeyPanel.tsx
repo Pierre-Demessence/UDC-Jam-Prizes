@@ -1,35 +1,17 @@
 import { useState } from 'react';
 
+import { keyNeed } from '@/admin/asset-table';
 import { api } from '@/api';
 
 import type { AdminAsset } from '../../server/payloads.ts';
-import type { KeyStatus } from '../../server/validate.ts';
 
-const STATUS_LABELS: Record<KeyStatus, string> = {
-  available: '○ available',
-  sent: '✓ sent',
-};
-
-/** One key, with the winner it went to. */
+/** One stored key: the value, and a way to remove it. */
 function KeyRow({ asset, onChanged, record }: {
   asset: AdminAsset;
   onChanged: (asset: AdminAsset) => void;
   record: AdminAsset['keys'][number];
 }) {
-  const [status, setStatus] = useState<KeyStatus>(record.status as KeyStatus);
-  const [winner, setWinner] = useState(record.assignedTo ?? '');
   const [message, setMessage] = useState<string | null>(null);
-
-  async function save(): Promise<void> {
-    setMessage(null);
-
-    try {
-      onChanged((await api.updateKey(asset.id, record.id, { assignedTo: winner.trim() === '' ? null : winner.trim(), status })).asset);
-    }
-    catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : String(cause));
-    }
-  }
 
   async function remove(): Promise<void> {
     try {
@@ -40,22 +22,9 @@ function KeyRow({ asset, onChanged, record }: {
     }
   }
 
-  const needsWinner = status === 'sent';
-
   return (
     <li className="key-row">
       <code className="key-value">{record.keyValue}</code>
-      <select aria-label="Key status" onChange={event => setStatus(event.target.value as KeyStatus)} value={status}>
-        {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-      </select>
-      <input
-        aria-label="Winner"
-        disabled={!needsWinner}
-        onChange={event => setWinner(event.target.value)}
-        placeholder={needsWinner ? 'winner name' : 'no winner yet'}
-        value={winner}
-      />
-      <button className="button-small" onClick={() => void save()} type="button">Update</button>
       <button className="button-small button-danger" onClick={() => void remove()} type="button">Remove</button>
       {message === null ? null : <span className="key-error" role="alert">{message}</span>}
     </li>
@@ -97,7 +66,10 @@ export function KeyPanel({ asset, onChanged }: { asset: AdminAsset; onChanged: (
     }
   }
 
-  const sent = asset.keys.filter(key => key.status === 'sent').length;
+  const { needed, obtained, state } = keyNeed(asset);
+  const stock = asset.keys.length === 0
+    ? 'No keys stored yet.'
+    : `${obtained} ${obtained === 1 ? 'key' : 'keys'} stored.`;
 
   return (
     <div className="key-panel">
@@ -129,9 +101,9 @@ export function KeyPanel({ asset, onChanged }: { asset: AdminAsset; onChanged: (
           Add keys
         </button>
         <p className="hint">
-          {asset.keys.length === 0
-            ? 'No keys stored yet.'
-            : `${sent} of ${asset.keys.length} keys given to a winner.`}
+          {needed === 0
+            ? stock
+            : `${stock} The winners asked for ${needed}${state === 'short' ? `, ${needed - obtained} still to get` : ', all here'}.`}
         </p>
       </div>
 

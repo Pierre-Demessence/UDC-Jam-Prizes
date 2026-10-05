@@ -22,6 +22,8 @@ const MAX_NOTES = 2000;
 const MAX_URL = 2000;
 const MAX_KEY = 200;
 const MAX_HANDLE = 100;
+/** Nobody is going to hand out more keys than this for one prize. */
+const MAX_NEEDED = 999;
 /** One paste of links, so a single request cannot turn into a long crawl. */
 export const MAX_IMPORT_URLS = 20;
 
@@ -40,15 +42,6 @@ export interface AssetInput {
 export interface ContactInput {
   contactNotes: string | null;
   discordHandle: string;
-}
-
-export const KEY_STATUSES = ['available', 'sent'] as const;
-
-export type KeyStatus = (typeof KEY_STATUSES)[number];
-
-export interface KeyStatusInput {
-  assignedTo: string | null;
-  status: KeyStatus;
 }
 
 function text(value: unknown, field: string, max: number, required: boolean): Validation<string | null> {
@@ -190,28 +183,6 @@ export function parseContactInput(body: unknown): Validation<ContactInput> {
   };
 }
 
-export function parseKeyStatusInput(body: unknown): Validation<KeyStatusInput> {
-  if (typeof body !== 'object' || body === null)
-    return { error: 'Expected a JSON object.', ok: false };
-
-  const raw = body as Record<string, unknown>;
-  const status = text(raw.status, 'The status', 20, true);
-  const assignedTo = text(raw.assignedTo, 'The winner', MAX_NAME, false);
-
-  if (!status.ok)
-    return status;
-  if (!assignedTo.ok)
-    return assignedTo;
-
-  if (!KEY_STATUSES.includes(status.value as KeyStatus))
-    return { error: `The status must be one of: ${KEY_STATUSES.join(', ')}.`, ok: false };
-
-  if (status.value === 'sent' && assignedTo.value === null)
-    return { error: 'Say who the key is for, or mark it available again.', ok: false };
-
-  return { ok: true, value: { assignedTo: assignedTo.value, status: status.value as KeyStatus } };
-}
-
 /** Accepts either a list or a blob of pasted keys, one per line or comma. */
 export function parseKeyValues(body: unknown): Validation<string[]> {
   if (typeof body !== 'object' || body === null)
@@ -265,4 +236,18 @@ export function parseId(value: string): number | null {
 
   const id = Number(value);
   return id > 0 ? id : null;
+}
+
+/** How many keys the winners asked for. Zero means nothing is needed. */
+export function parseNeededInput(body: unknown): Validation<{ needed: number }> {
+  if (typeof body !== 'object' || body === null)
+    return { error: 'Expected a JSON object.', ok: false };
+
+  const raw = (body as { needed?: unknown }).needed;
+  const needed = typeof raw === 'number' ? raw : Number(String(raw ?? '').trim());
+
+  if (!Number.isInteger(needed) || needed < 0 || needed > MAX_NEEDED)
+    return { error: `How many keys are needed must be a whole number between 0 and ${MAX_NEEDED}.`, ok: false };
+
+  return { ok: true, value: { needed } };
 }

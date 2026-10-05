@@ -7,7 +7,7 @@ import { asc, eq, sql } from 'drizzle-orm';
 import type { DatabaseHandle } from './db.ts';
 import type { AdminAsset, PublicCatalogue } from './payloads.ts';
 import type { Asset } from './schema.ts';
-import type { AssetInput, ContactInput, KeyStatusInput } from './validate.ts';
+import type { AssetInput, ContactInput } from './validate.ts';
 
 import { toAdminAsset, toPublicAsset } from './payloads.ts';
 import { assets, contacts, keys } from './schema.ts';
@@ -77,6 +77,17 @@ export function updateAsset(db: Db, id: number, input: AssetInput, secret: strin
 
 export function deleteAsset(db: Db, id: number): boolean {
   return db.delete(assets).where(eq(assets.id, id)).run().changes > 0;
+}
+
+/** How many keys the winners asked for, set from the admin table's own field. */
+export function updateNeeded(db: Db, id: number, needed: number, secret: string): AdminAsset | null {
+  const existing = db.select().from(assets).where(eq(assets.id, id)).get();
+  if (!existing)
+    return null;
+
+  db.update(assets).set({ needed }).where(eq(assets.id, id)).run();
+
+  return adminAsset(db, id, secret);
 }
 
 /** One contact per asset: the author behind the prize. */
@@ -153,22 +164,6 @@ export function encryptLegacyKeys(db: Db, secret: string): number {
   }
 
   return migrated;
-}
-
-export function updateKey(db: Db, assetId: number, keyId: number, input: KeyStatusInput, secret: string): AdminAsset | null {
-  const existing = db.select().from(keys).where(eq(keys.id, keyId)).get();
-  if (!existing || existing.assetId !== assetId)
-    return adminAsset(db, assetId, secret);
-
-  // A key is available or sent; `sentAt` records when it reached a winner.
-  const sentAt = input.status === 'sent' ? existing.sentAt ?? new Date() : null;
-
-  db.update(keys)
-    .set({ assignedTo: input.status === 'available' ? null : input.assignedTo, sentAt, status: input.status })
-    .where(eq(keys.id, keyId))
-    .run();
-
-  return adminAsset(db, assetId, secret);
 }
 
 export function deleteKey(db: Db, assetId: number, keyId: number, secret: string): AdminAsset | null {

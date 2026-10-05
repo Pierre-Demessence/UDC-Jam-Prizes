@@ -57,6 +57,11 @@ a:hover {
   gap: 24px;
 }
 
+/* The admin is a desktop tool: the public list is the responsive one. */
+.page-wide {
+  max-width: 1680px;
+}
+
 /* Header */
 
 .site-header {
@@ -526,26 +531,28 @@ button:disabled {
 }
 
 /* One line per cell, so rows stay short; the table scrolls sideways instead of
-   wrapping short values like a category or an author. Only the name wraps. */
+   wrapping short values like a category or an author. Only the name wraps.
+   These selectors carry `.admin-table` on purpose: `.admin-table td` above sets
+   text-align and white-space, and a bare class would lose to it. */
 .admin-table tbody td {
   white-space: nowrap;
 }
 
-.cell-name {
+.admin-table .cell-name {
   font-weight: 600;
   min-width: 240px;
   overflow-wrap: anywhere;
   white-space: normal;
 }
 
-.cell-number {
+.admin-table .cell-number {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
 /* Width 1% is the usual way to say "as narrow as the buttons inside": without
    it the three buttons claim the space the names and categories need. */
-.cell-actions {
+.admin-table .cell-actions {
   white-space: nowrap;
   width: 1%;
 }
@@ -555,6 +562,65 @@ button:disabled {
   padding: 0 12px 14px;
   background: var(--surface-2);
   white-space: normal;
+}
+
+/* How a prize stands against the keys its winners asked for. The tint is one
+   cue and the chip's glyph and words are the other: never colour alone. A row
+   nobody asked for carries neither. */
+.row-short th,
+.row-short td {
+  background: rgb(255 138 138 / 10%);
+}
+
+.row-short th.cell-name {
+  box-shadow: inset 3px 0 0 0 var(--danger);
+}
+
+.row-covered th,
+.row-covered td {
+  background: rgb(134 217 154 / 10%);
+}
+
+.row-covered th.cell-name {
+  box-shadow: inset 3px 0 0 0 var(--ok);
+}
+
+.needed-cell {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+/* Sized for two digits, which is as many keys as a prize ever needs. */
+.needed-input {
+  width: 3.25rem;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-small);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+/* The badge is a glyph, not the counts: the Keys column already holds the number
+   of keys, and the counts live in the tooltip. */
+.need-mark {
+  width: 1rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+  line-height: 1;
+  text-align: center;
+}
+
+.need-short {
+  color: var(--danger);
+}
+
+.need-covered {
+  color: var(--ok);
 }
 
 .confirm-delete {
@@ -586,13 +652,13 @@ button:disabled {
 }
 
 .key-row {
-  display: grid;
-  grid-template-columns: minmax(120px, 1fr) auto minmax(120px, 1fr) auto auto;
-  gap: 8px;
+  display: flex;
+  gap: 10px;
   align-items: center;
 }
 
 .key-value {
+  flex: 1;
   padding: 6px 8px;
   background: var(--surface-2);
   border: 1px solid var(--border);
@@ -603,7 +669,6 @@ button:disabled {
 }
 
 .key-error {
-  grid-column: 1 / -1;
   color: var(--danger);
   font-size: 0.85rem;
 }
@@ -611,14 +676,6 @@ button:disabled {
 @media (max-width: 720px) {
   .page {
     padding: 24px 14px 56px;
-  }
-
-  .key-row {
-    grid-template-columns: 1fr 1fr;
-  }
-
-  .key-value {
-    grid-column: 1 / -1;
   }
 }
 

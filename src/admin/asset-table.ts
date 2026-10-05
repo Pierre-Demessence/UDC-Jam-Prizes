@@ -6,7 +6,7 @@ import type { AdminAsset } from '../../server/payloads.ts';
 /** The admin table's columns and how each one orders the rows. */
 
 export type SortDirection = 'ascending' | 'descending';
-export type SortKey = 'author' | 'category' | 'contact' | 'keys' | 'name' | 'price';
+export type SortKey = 'author' | 'category' | 'contact' | 'keys' | 'name' | 'needed' | 'price';
 
 export interface Sort {
   direction: SortDirection;
@@ -30,6 +30,7 @@ export const COLUMNS: Column[] = [
   { key: 'category', label: 'Category', title: 'Read from the address of the store page.' },
   { alignEnd: true, key: 'price', label: 'Price', title: 'What the asset costs, read from the page and editable.' },
   { alignEnd: true, key: 'keys', label: 'Keys', title: 'How many keys are stored for this prize, and where each one went.' },
+  { alignEnd: true, key: 'needed', label: 'Needed', title: 'How many keys the winners asked for. Zero means nobody asked, and the row stays plain.' },
   { key: 'contact', label: 'Contact', title: 'Discord handle of the person who donated the prize. Private.' },
   { key: null, label: 'Actions', title: 'Edit the prize, open its keys and contact, or delete it.' },
 ];
@@ -42,16 +43,47 @@ export function nextSort(sort: Sort, key: SortKey): Sort {
   return { direction: sort.direction === 'ascending' ? 'descending' : 'ascending', key };
 }
 
-const KEY_STATUS_ORDER = ['available', 'sent'];
+/** How a prize stands against the number of keys its winners asked for. */
+export interface KeyNeed {
+  /** Keys the winners asked for. */
+  needed: number;
+  /** Keys stored for this prize. */
+  obtained: number;
+  state: 'none' | 'short' | 'covered';
+}
 
-/** `2 available · 1 sent`, so a count of three says what it is made of. */
+/**
+ * A prize nobody asked for stays plain, even when a publisher sent keys ahead of
+ * time. Otherwise it is short until the requested number of keys is stored.
+ */
+export function keyNeed(asset: AdminAsset): KeyNeed {
+  const obtained = asset.keys.length;
+
+  return {
+    needed: asset.needed,
+    obtained,
+    state: asset.needed === 0 ? 'none' : obtained < asset.needed ? 'short' : 'covered',
+  };
+}
+
+/** The row class that colours a prize against its request, or nothing when it is plain. */
+export function needClass(need: KeyNeed): string | undefined {
+  if (need.state === 'short')
+    return 'row-short';
+
+  return need.state === 'covered' ? 'row-covered' : undefined;
+}
+
+/** `3 of 5 keys`, the companion to the state: a count is never shown alone. */
+export function needLabel(need: KeyNeed): string {
+  return `${need.obtained} of ${need.needed} keys`;
+}
+
+/** What the Keys column's count is, for the column's tooltip. */
 export function keySummary(asset: AdminAsset): string {
-  const parts = KEY_STATUS_ORDER
-    .map(status => ({ count: asset.keys.filter(key => key.status === status).length, status }))
-    .filter(entry => entry.count > 0)
-    .map(entry => `${entry.count} ${entry.status}`);
+  const count = asset.keys.length;
 
-  return parts.length === 0 ? 'No keys stored yet.' : parts.join(' · ');
+  return count === 0 ? 'No keys stored yet.' : `${count} ${count === 1 ? 'key' : 'keys'} stored.`;
 }
 
 /** A copy, sorted; the caller's array is left alone. */
@@ -70,6 +102,8 @@ export function sortAssets(assets: AdminAsset[], sort: Sort): AdminAsset[] {
         return compareOptional(left.contact?.discordHandle ?? null, right.contact?.discordHandle ?? null, text, direction) || byName(left, right);
       case 'keys':
         return direction * (left.keys.length - right.keys.length) || byName(left, right);
+      case 'needed':
+        return direction * (left.needed - right.needed) || byName(left, right);
       case 'price':
         return compareOptional(left.priceCents, right.priceCents, (a, b) => a - b, direction) || byName(left, right);
       case 'name':

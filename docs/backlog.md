@@ -13,8 +13,6 @@ that completes it.
   twelve hours (`server/auth.ts`).
 - `connectDatabase` always creates the data directory, opens the file read-write and migrates it, so
   a read-only or second instance would fail at startup (`server/db.ts`).
-- `keys.assigned_at` is no longer written by anything: drop the column once nothing needs the dates on
-  the rows that still carry one (`server/schema.ts`).
 - `src/styles.css` keeps a `.mono` rule nothing uses (`src/styles.css`).
 - The public page is client-rendered; add a prerender or static export if it ever needs to be
   crawlable or link-preview friendly.
