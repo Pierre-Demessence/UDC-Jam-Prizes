@@ -70,8 +70,10 @@ index that turns re-importing a sheet row into an update instead of a duplicate.
 
 `connectDatabase` applies the generated migrations, so a stale database cannot happen and a fresh clone
 just works. `npm run db:generate` writes the SQL after a schema change; `npm run db:migrate` remains for
-a deploy that prefers an explicit step. Rejected: migrating by hand before each run, which surfaces as a
-"no such table" error while serving a request.
+a deploy that prefers an explicit step. A caller that must not write says so through the options —
+`{ readonly: true }` for a handle that only reads, `{ migrate: false }` for a process that writes but
+must not change the schema — and the app itself passes neither. Rejected: migrating by hand before each
+run, which surfaces as a "no such table" error while serving a request.
 
 ## Assets are a flat list, with no quantities
 
