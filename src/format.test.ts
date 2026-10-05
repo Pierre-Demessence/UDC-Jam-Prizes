@@ -11,8 +11,8 @@ describe('formatPrice', () => {
     expect(formatPrice(0)).toBe('$0.00');
   });
 
-  it('says so when the price is unknown', () => {
-    expect(formatPrice(null)).toBe('price unknown');
+  it('shows nothing when the price is unknown', () => {
+    expect(formatPrice(null)).toBe('');
   });
 });
 

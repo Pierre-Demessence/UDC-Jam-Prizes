@@ -9,7 +9,7 @@ const CURRENCY = 'USD';
 
 export function formatPrice(priceCents: number | null): string {
   if (priceCents === null)
-    return 'price unknown';
+    return '';
 
   return new Intl.NumberFormat(LOCALE, { currency: CURRENCY, style: 'currency' }).format(priceCents / 100);
 }
