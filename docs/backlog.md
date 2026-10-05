@@ -13,8 +13,6 @@ that completes it.
   twelve hours (`server/auth.ts`).
 - `connectDatabase` always creates the data directory, opens the file read-write and migrates it, so
   a read-only or second instance would fail at startup (`server/db.ts`).
-- `keys.key_value` is stored in clear text: encrypt it at rest (AES-256, key from the environment)
-  before any real key is entered (`server/schema.ts`).
 - The public page is client-rendered; add a prerender or static export if it ever needs to be
   crawlable or link-preview friendly.
 - No automated accessibility check: `eslint-plugin-jsx-a11y` caps at ESLint 9 (`eslint.config.ts`).

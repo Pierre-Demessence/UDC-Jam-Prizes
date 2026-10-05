@@ -119,6 +119,33 @@ allowed outside production so a dev machine cannot lock itself out.
 The consequence to know: behind a reverse proxy every visitor arrives from the proxy's address, so the
 list, like the rate limiter, sees one address for everyone (`docs/backlog.md`).
 
+## Key values are encrypted at rest
+
+A donated key is worth money, so a copy of `data/prizes.sqlite` — a backup, a synced folder, a stolen
+laptop — should not hand out working keys. Values are stored as AES-256-GCM ciphertext in
+`keys.key_value`, with the key derived from `KEY_ENCRYPTION_SECRET` (scrypt, then cached, because a
+paste of twenty keys would otherwise pay the derivation cost forty times).
+
+GCM authenticates as well as encrypts: a value that was edited in the database fails to open instead
+of coming back as garbage. The admin screen then prints "unreadable: KEY_ENCRYPTION_SECRET cannot open
+this value" for that row rather than base64 nobody would notice. A value only counts as ciphertext
+when it has the shape ours do — the `v1:` prefix, valid base64, and long enough to hold an iv and an
+auth tag — so a donated key that literally starts with `v1:` is encrypted like any other instead of
+being mistaken for a broken row.
+
+Encryption is randomised, so the same key stored twice has two different ciphertexts and the old
+`UNIQUE` index on `key_value` can no longer spot a duplicate. A second column, `key_fingerprint`, holds
+an HMAC-SHA256 of the key — deterministic, one-way, and salted with the same secret, so fingerprints
+only compare within one deployment. It is nullable, and the app rewrites any row that lacks one at
+startup: that is how keys stored in clear text before this change get encrypted, and it is why the
+migration could be additive.
+
+Consequences worth knowing: losing `KEY_ENCRYPTION_SECRET` makes every stored key unreadable (the
+fingerprints cannot be reversed either); the admin API decrypts, so it is the only place a key is ever
+in clear, and the public payload has no key fields at all. Rejected: storing keys in a separate
+encrypted file (one more thing to back up, no gain) and a passphrase-derived key entered at start-up
+(the server would sit waiting for a human).
+
 ## One switch instead of a router
 
 `App.tsx` chooses between the gallery and the admin from `location.pathname`, and follows `popstate`.

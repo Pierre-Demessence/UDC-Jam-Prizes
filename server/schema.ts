@@ -47,15 +47,21 @@ export const contacts = sqliteTable('contacts', {
 ]);
 
 /**
- * A donated key. Private, and a secret: `keyValue` is stored in clear text for
- * now, encrypted at rest before real keys are entered (see docs/backlog.md).
+ * A donated key. Private, and a secret: `keyValue` holds AES-256-GCM ciphertext
+ * (see secrets.ts), never the key itself. Random initialisation means the same
+ * key encrypts differently every time, so the separate, deterministic
+ * `keyFingerprint` is what recognises a key that was pasted twice. It is
+ * nullable because rows written before encryption existed are backfilled at
+ * start-up; SQLite counts every NULL as distinct, so the unique index tolerates
+ * them.
  */
 export const keys = sqliteTable('keys', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   assignedAt: integer('assigned_at', { mode: 'timestamp_ms' }),
   assignedTo: text('assigned_to'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
-  keyValue: text('key_value').notNull().unique(),
+  keyFingerprint: text('key_fingerprint').unique(),
+  keyValue: text('key_value').notNull(),
   sentAt: integer('sent_at', { mode: 'timestamp_ms' }),
   assetId: integer('asset_id')
     .notNull()

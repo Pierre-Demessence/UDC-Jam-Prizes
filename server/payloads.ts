@@ -8,6 +8,8 @@
  */
 import type { Asset, Contact, Key } from './schema.ts';
 
+import { decryptSecret } from './secrets.ts';
+
 export interface PublicAsset {
   id: number;
   name: string;
@@ -56,6 +58,20 @@ function toIso(value: Date | null): string | null {
   return value === null ? null : value.toISOString();
 }
 
+/**
+ * A key that no longer opens — the encryption secret was changed, or the row was
+ * tampered with — is reported as such rather than shown as base64 nobody would
+ * notice.
+ */
+function readableKeyValue(stored: string, secret: string): string {
+  try {
+    return decryptSecret(stored, secret);
+  }
+  catch {
+    return '(unreadable: KEY_ENCRYPTION_SECRET cannot open this value)';
+  }
+}
+
 export function toPublicAsset(asset: Asset): PublicAsset {
   return {
     id: asset.id,
@@ -70,7 +86,7 @@ export function toPublicAsset(asset: Asset): PublicAsset {
   };
 }
 
-export function toAdminAsset(asset: Asset, contact: Contact | null, keys: Key[]): AdminAsset {
+export function toAdminAsset(asset: Asset, contact: Contact | null, keys: Key[], secret: string): AdminAsset {
   return {
     ...toPublicAsset(asset),
     contact: contact === null ? null : { contactNotes: contact.contactNotes, discordHandle: contact.discordHandle },
@@ -81,7 +97,7 @@ export function toAdminAsset(asset: Asset, contact: Contact | null, keys: Key[])
       id: key.id,
       assignedAt: toIso(key.assignedAt),
       assignedTo: key.assignedTo,
-      keyValue: key.keyValue,
+      keyValue: readableKeyValue(key.keyValue, secret),
       sentAt: toIso(key.sentAt),
       status: key.status,
     })),

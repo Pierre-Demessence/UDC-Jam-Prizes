@@ -86,12 +86,23 @@ describe('the private tables', () => {
     expect(handle.db.select().from(keys).all()).toHaveLength(0);
   });
 
-  it('refuses the same key twice', () => {
+  it('refuses two keys carrying the same fingerprint', () => {
+    const asset = addAsset();
+    handle.db.insert(keys)
+      .values({ assetId: asset.id, keyFingerprint: 'a-fingerprint', keyValue: 'v1:first' })
+      .run();
+
+    expect(() => handle.db.insert(keys)
+      .values({ assetId: asset.id, keyFingerprint: 'a-fingerprint', keyValue: 'v1:second' })
+      .run()).toThrow(/UNIQUE/i);
+  });
+
+  it('accepts several keys with no fingerprint yet, which the backfill relies on', () => {
     const asset = addAsset();
     handle.db.insert(keys).values({ assetId: asset.id, keyValue: 'ABCD-1234-EFGH' }).run();
+    handle.db.insert(keys).values({ assetId: asset.id, keyValue: 'IJKL-5678-MNOP' }).run();
 
-    expect(() => handle.db.insert(keys).values({ assetId: asset.id, keyValue: 'ABCD-1234-EFGH' }).run())
-      .toThrow(/UNIQUE/i);
+    expect(handle.db.select().from(keys).all()).toHaveLength(2);
   });
 
   it('defaults a key to available and tracks the assignment', () => {
@@ -126,7 +137,7 @@ describe('the schema itself', () => {
       'assets_asset_id_unique',
       'contacts_asset_id_index',
       'keys_asset_id_index',
-      'keys_key_value_unique',
+      'keys_key_fingerprint_unique',
     ]));
   });
 

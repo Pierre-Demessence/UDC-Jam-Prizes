@@ -10,7 +10,7 @@ Scaffolded with [create-corniflex](https://github.com/Pierre-Demessence/create-c
 
 ```sh
 npm install
-Copy-Item .env.example .env   # then set ADMIN_PASSWORD and SESSION_SECRET
+Copy-Item .env.example .env   # then set ADMIN_PASSWORD, KEY_ENCRYPTION_SECRET and SESSION_SECRET
 npm run dev
 ```
 
@@ -18,8 +18,10 @@ npm run dev
 <http://localhost:3001> (proxied under `/api`). The SQLite file is created in `data/` on first run.
 
 `ADMIN_PASSWORD` is the admin login; `SESSION_SECRET` (16+ characters) signs the session cookie.
-Both are read from `.env`, which is gitignored. `npm start` runs one process serving the built client
-and the API, which is what a deployment would run.
+`KEY_ENCRYPTION_SECRET` (32+ characters) encrypts donated key values at rest, so a copy of the
+SQLite file is useless without it: keep it safe, it is the only thing that can open the stored keys.
+All three are read from `.env`, which is gitignored. `npm start` runs one process serving the built
+client and the API, which is what a deployment would run.
 
 ## Scripts
 
@@ -48,7 +50,8 @@ and the API, which is what a deployment would run.
   image, publisher, category, price and Unity id filled in from the page, keep the author's Discord
   handle and internal notes, and paste the keys the author sends to record who received which one.
   *Paste several links* adds a whole batch at once (up to 20, read a few at a time), reporting per
-  link whether it was added, already there, or unreadable.
+  link whether it was added, already there, or unreadable. Key values are encrypted on the way in and
+  decrypted for the admin screen only; they never leave the server in a public response.
 - The price is an ordinary field: read from the page when it offers one, editable, and allowed to stay
   empty when the page has none.
 

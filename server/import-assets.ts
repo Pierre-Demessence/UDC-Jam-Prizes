@@ -43,6 +43,7 @@ export async function importAssets(
   db: Db,
   fetchImpl: typeof fetch,
   urls: string[],
+  keyEncryptionSecret: string,
 ): Promise<ImportOutcome> {
   const results: ImportResult[] = [];
   let cursor = 0;
@@ -58,7 +59,7 @@ export async function importAssets(
         return { name: existing.name, message: 'Already in the list.', status: 'duplicate', url: url.href };
       }
 
-      const asset = createAsset(db, assetInputFromMetadata(metadata));
+      const asset = createAsset(db, assetInputFromMetadata(metadata), keyEncryptionSecret);
 
       return { name: asset.name, message: null, status: 'added', url: asset.assetUrl };
     }

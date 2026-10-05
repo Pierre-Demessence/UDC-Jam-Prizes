@@ -74,6 +74,8 @@ async function readJson(c: Context): Promise<Record<string, unknown> | null> {
 export function createApp({ config, fetchImpl, handle }: AppOptions) {
   const app = new Hono();
   const db = handle.db;
+  // Admin payloads carry key values, which are decrypted on the way out.
+  const { keyEncryptionSecret } = config;
   const importLimiter = createRateLimiter(rateLimits.import);
   const loginLimiter = createRateLimiter(rateLimits.login);
   const metadataLimiter = createRateLimiter(rateLimits.metadata);
@@ -221,14 +223,14 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
     if (!urls.ok)
       return c.json({ error: urls.error }, 400);
 
-    const outcome = await importAssets(db, fetchImpl ?? fetch, urls.value);
+    const outcome = await importAssets(db, fetchImpl ?? fetch, urls.value, keyEncryptionSecret);
 
-    return c.json({ ...outcome, assets: adminCatalogue(db) }, 201);
+    return c.json({ ...outcome, assets: adminCatalogue(db, keyEncryptionSecret) }, 201);
   });
 
   app.get('/api/admin/assets', (c) => {
     const denied = requireAdmin(c);
-    return denied ?? c.json({ assets: adminCatalogue(db) });
+    return denied ?? c.json({ assets: adminCatalogue(db, keyEncryptionSecret) });
   });
 
   app.post('/api/admin/assets', async (c) => {
@@ -243,7 +245,7 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
     if (findAssetByAssetId(db, input.value.assetId) !== null)
       return c.json({ error: 'That asset is already in the list.' }, 409);
 
-    return c.json({ asset: createAsset(db, input.value) }, 201);
+    return c.json({ asset: createAsset(db, input.value, keyEncryptionSecret) }, 201);
   });
 
   app.patch('/api/admin/assets/:id', async (c) => {
@@ -263,7 +265,7 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
     if (clash !== null && clash.id !== id)
       return c.json({ error: 'Another prize already uses that Unity id.' }, 409);
 
-    const asset = updateAsset(db, id, input.value);
+    const asset = updateAsset(db, id, input.value, keyEncryptionSecret);
     return asset === null ? c.json({ error: 'Unknown asset.' }, 404) : c.json({ asset });
   });
 
@@ -285,7 +287,7 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
       return denied;
 
     const id = parseId(c.req.param('id'));
-    const asset = id === null ? null : adminAsset(db, id);
+    const asset = id === null ? null : adminAsset(db, id, keyEncryptionSecret);
     if (id === null || asset === null)
       return c.json({ error: 'Unknown asset.' }, 404);
 
@@ -294,7 +296,7 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
       return c.json({ error: input.error }, 400);
 
     saveContact(db, id, input.value);
-    return c.json({ asset: adminAsset(db, id) });
+    return c.json({ asset: adminAsset(db, id, keyEncryptionSecret) });
   });
 
   app.post('/api/admin/assets/:id/keys', async (c) => {
@@ -303,19 +305,19 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
       return denied;
 
     const id = parseId(c.req.param('id'));
-    if (id === null || adminAsset(db, id) === null)
+    if (id === null || adminAsset(db, id, keyEncryptionSecret) === null)
       return c.json({ error: 'Unknown asset.' }, 404);
 
     const input = parseKeyValues(await readJson(c));
     if (!input.ok)
       return c.json({ error: input.error }, 400);
 
-    const added = addKeys(db, id, input.value);
+    const added = addKeys(db, id, input.value, keyEncryptionSecret);
     const skipped = input.value.length - added;
 
     return c.json({
       added,
-      asset: adminAsset(db, id),
+      asset: adminAsset(db, id, keyEncryptionSecret),
       skipped,
     }, 201);
   });
@@ -327,14 +329,14 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
 
     const id = parseId(c.req.param('id'));
     const keyId = parseId(c.req.param('keyId'));
-    if (id === null || keyId === null || adminAsset(db, id) === null)
+    if (id === null || keyId === null || adminAsset(db, id, keyEncryptionSecret) === null)
       return c.json({ error: 'Unknown key.' }, 404);
 
     const input = parseKeyStatusInput(await readJson(c));
     if (!input.ok)
       return c.json({ error: input.error }, 400);
 
-    return c.json({ asset: updateKey(db, id, keyId, input.value) });
+    return c.json({ asset: updateKey(db, id, keyId, input.value, keyEncryptionSecret) });
   });
 
   app.delete('/api/admin/assets/:id/keys/:keyId', (c) => {
@@ -344,10 +346,10 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
 
     const id = parseId(c.req.param('id'));
     const keyId = parseId(c.req.param('keyId'));
-    if (id === null || keyId === null || adminAsset(db, id) === null)
+    if (id === null || keyId === null || adminAsset(db, id, keyEncryptionSecret) === null)
       return c.json({ error: 'Unknown key.' }, 404);
 
-    return c.json({ asset: deleteKey(db, id, keyId) });
+    return c.json({ asset: deleteKey(db, id, keyId, keyEncryptionSecret) });
   });
 
   app.notFound((c) => {

@@ -265,6 +265,66 @@ describe('the keys behind a prize', () => {
     expect(await second.json()).toMatchObject({ added: 1, skipped: 1 });
   });
 
+  it('keeps the key values encrypted on disk', async () => {
+    const cookie = await signIn();
+    const { assetId } = await assetWithKeys(cookie);
+
+    const rows = handle.sqlite
+      .prepare('select key_value, key_fingerprint from keys where asset_id = ? order by id')
+      .all(assetId) as { key_fingerprint: string; key_value: string }[];
+
+    expect(rows).toHaveLength(2);
+    for (const row of rows) {
+      expect(row.key_value).toMatch(/^v1:/);
+      expect(row.key_value).not.toContain('KEY-');
+      // A fingerprint, not the key: recognised without being reversible.
+      expect(row.key_fingerprint).toMatch(/^[0-9a-f]{64}$/);
+    }
+    expect(rows[0].key_value).not.toBe(rows[1].key_value);
+  });
+
+  it('hands the readable key back to the admin, and never to a public visitor', async () => {
+    const cookie = await signIn();
+    const { assetId } = await assetWithKeys(cookie);
+
+    const adminBody = await (await app.request('/api/admin/assets', { headers: { cookie } }))
+      .json() as { assets: { id: number; keys: { keyValue: string }[] }[] };
+
+    expect(adminBody.assets.find(a => a.id === assetId)?.keys.map(key => key.keyValue))
+      .toEqual(['KEY-1', 'KEY-2']);
+
+    const publicBody = await (await app.request('/api/assets')).json() as { assets: Record<string, unknown>[] };
+    // Neither the key nor its stored form: the public list has no key fields at all.
+    expect(JSON.stringify(publicBody)).not.toContain('KEY-');
+    expect(JSON.stringify(publicBody)).not.toContain('v1:');
+  });
+
+  it('still spots a repeated key although its ciphertext differs every time', async () => {
+    const cookie = await signIn();
+    const asset = await addAsset(cookie);
+
+    await app.request(`/api/admin/assets/${asset.id}/keys`, json({ keys: 'same-key-here' }, cookie));
+    const again = await app.request(`/api/admin/assets/${asset.id}/keys`, json({ keys: 'same-key-here' }, cookie));
+
+    expect(await again.json()).toMatchObject({ added: 0, skipped: 1 });
+  });
+
+  it('says a key is unreadable when the encryption secret no longer opens it', async () => {
+    const cookie = await signIn();
+    const { assetId } = await assetWithKeys(cookie);
+    const stored = (handle.sqlite.prepare('select key_value from keys where asset_id = ?').get(assetId) as { key_value: string }).key_value;
+
+    // Edit the ciphertext the way a changed secret or a corrupted row would: well
+    // formed, but it no longer authenticates.
+    handle.sqlite.prepare('update keys set key_value = ? where asset_id = ?')
+      .run(`${stored.slice(0, -4)}AAAA`, assetId);
+
+    const body = await (await app.request('/api/admin/assets', { headers: { cookie } }))
+      .json() as { assets: { id: number; keys: { keyValue: string }[] }[] };
+
+    expect(body.assets.find(a => a.id === assetId)?.keys[0].keyValue).toMatch(/unreadable/);
+  });
+
   it('assigns a key to a winner', async () => {
     const cookie = await signIn();
     const { assetId, keyId } = await assetWithKeys(cookie);

@@ -8,6 +8,7 @@ import type { Config } from './config.ts';
 import { createApp } from './app.ts';
 import { ConfigError, readConfig } from './config.ts';
 import { connectDatabase } from './db.ts';
+import { encryptLegacyKeys } from './repository.ts';
 
 let config: Config;
 try {
@@ -24,6 +25,14 @@ catch (error) {
 }
 
 const handle = connectDatabase(config.databasePath);
+
+// Keys written before encryption existed are rewritten here, before the server
+// takes a request. On a healthy database this does nothing.
+const encrypted = encryptLegacyKeys(handle.db, config.keyEncryptionSecret);
+if (encrypted > 0)
+  // eslint-disable-next-line no-console
+  console.log(`Encrypted ${encrypted} key${encrypted === 1 ? '' : 's'} that were stored in clear text`);
+
 const app = createApp({ config, handle });
 
 // In a deployment this process also serves the built client. In development

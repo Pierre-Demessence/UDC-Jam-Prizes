@@ -15,6 +15,13 @@
       "when": 1791217790019,
       "tag": "0001_amazing_white_queen",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791227303444,
+      "tag": "0002_furry_spyke",
+      "breakpoints": true
     }
   ]
 }

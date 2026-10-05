@@ -20,6 +20,8 @@ export interface Config {
   adminPassword: string;
   cookieSecure: boolean;
   databasePath: string | undefined;
+  /** Encrypts donated key values at rest. Losing it makes every stored key unreadable. */
+  keyEncryptionSecret: string;
   port: number;
   sessionSecret: string;
 }
@@ -32,25 +34,36 @@ export class ConfigError extends Error {
 }
 
 const MIN_SECRET_LENGTH = 16;
+/** Longer than the session secret: this one protects data at rest, not a cookie. */
+const MIN_ENCRYPTION_SECRET_LENGTH = 32;
 const DEFAULT_PORT = 3001;
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const adminPassword = env.ADMIN_PASSWORD?.trim() ?? '';
+  const keyEncryptionSecret = env.KEY_ENCRYPTION_SECRET?.trim() ?? '';
   const sessionSecret = env.SESSION_SECRET?.trim() ?? '';
 
   const missing = [
     adminPassword === '' ? 'ADMIN_PASSWORD' : null,
+    keyEncryptionSecret === '' ? 'KEY_ENCRYPTION_SECRET' : null,
     sessionSecret === '' ? 'SESSION_SECRET' : null,
   ].filter((name): name is string => name !== null);
 
   if (missing.length > 0) {
     throw new ConfigError(
-      `Missing ${missing.join(' and ')}. Copy .env.example to .env and fill it in.`,
+      `Missing ${missing.join(', ')}. Copy .env.example to .env and fill it in.`,
     );
   }
 
   if (sessionSecret.length < MIN_SECRET_LENGTH)
     throw new ConfigError(`SESSION_SECRET must be at least ${MIN_SECRET_LENGTH} characters.`);
+
+  // A short secret here would make the stored keys cheap to brute-force offline.
+  if (keyEncryptionSecret.length < MIN_ENCRYPTION_SECRET_LENGTH) {
+    throw new ConfigError(
+      `KEY_ENCRYPTION_SECRET must be at least ${MIN_ENCRYPTION_SECRET_LENGTH} characters. Generate one with: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`,
+    );
+  }
 
   const port = Number.parseInt(env.PORT ?? String(DEFAULT_PORT), 10);
   if (!Number.isInteger(port) || port < 1 || port > 65_535)
@@ -74,6 +87,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
     // Secure cookies need https; a local http dev server would never send them.
     cookieSecure: env.NODE_ENV === 'production',
     databasePath: env.DATABASE_PATH?.trim() || undefined,
+    keyEncryptionSecret,
     port,
     sessionSecret,
   };

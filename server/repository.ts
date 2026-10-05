@@ -11,6 +11,7 @@ import type { AssetInput, ContactInput, KeyStatusInput } from './validate.ts';
 
 import { toAdminAsset, toPublicAsset } from './payloads.ts';
 import { assets, contacts, keys } from './schema.ts';
+import { decryptSecret, encryptSecret, fingerprintSecret, isEncrypted } from './secrets.ts';
 
 type Db = DatabaseHandle['db'];
 
@@ -32,7 +33,7 @@ export function publicCatalogue(db: Db): PublicCatalogue {
 }
 
 /** Everything the admin screen needs, private fields included. */
-export function adminCatalogue(db: Db): AdminAsset[] {
+export function adminCatalogue(db: Db, secret: string): AdminAsset[] {
   const rows = db.select().from(assets).orderBy(asc(assets.name)).all();
   // Loaded in bulk and grouped here: a jam's prize list is small, and this
   // keeps one query per table instead of one per asset.
@@ -43,10 +44,11 @@ export function adminCatalogue(db: Db): AdminAsset[] {
     asset,
     contactRows.find(contact => contact.assetId === asset.id) ?? null,
     keyRows.filter(key => key.assetId === asset.id),
+    secret,
   ));
 }
 
-export function adminAsset(db: Db, id: number): AdminAsset | null {
+export function adminAsset(db: Db, id: number, secret: string): AdminAsset | null {
   const asset = db.select().from(assets).where(eq(assets.id, id)).get();
   if (!asset)
     return null;
@@ -54,23 +56,23 @@ export function adminAsset(db: Db, id: number): AdminAsset | null {
   const contact = db.select().from(contacts).where(eq(contacts.assetId, id)).get() ?? null;
   const rows = db.select().from(keys).where(eq(keys.assetId, id)).all();
 
-  return toAdminAsset(asset, contact, rows);
+  return toAdminAsset(asset, contact, rows, secret);
 }
 
 export function findAssetByAssetId(db: Db, assetId: string): Asset | null {
   return db.select().from(assets).where(eq(assets.assetId, assetId)).get() ?? null;
 }
 
-export function createAsset(db: Db, input: AssetInput): AdminAsset {
+export function createAsset(db: Db, input: AssetInput, secret: string): AdminAsset {
   const asset = db.insert(assets).values(input).returning().get();
 
-  return toAdminAsset(asset, null, []);
+  return toAdminAsset(asset, null, [], secret);
 }
 
-export function updateAsset(db: Db, id: number, input: AssetInput): AdminAsset | null {
+export function updateAsset(db: Db, id: number, input: AssetInput, secret: string): AdminAsset | null {
   db.update(assets).set(input).where(eq(assets.id, id)).run();
 
-  return adminAsset(db, id);
+  return adminAsset(db, id, secret);
 }
 
 export function deleteAsset(db: Db, id: number): boolean {
@@ -85,21 +87,78 @@ export function saveContact(db: Db, assetId: number, input: ContactInput): void 
     .run();
 }
 
-/** Adds pasted keys, ignoring the ones already stored. Returns how many landed. */
-export function addKeys(db: Db, assetId: number, values: string[]): number {
+/**
+ * Adds pasted keys, ignoring the ones already stored. Returns how many landed.
+ * The value is encrypted, and its fingerprint is what spots the duplicate.
+ */
+export function addKeys(db: Db, assetId: number, values: string[], secret: string): number {
   const result = db
     .insert(keys)
-    .values(values.map(keyValue => ({ assetId, keyValue })))
+    .values(values.map(value => ({
+      assetId,
+      keyFingerprint: fingerprintSecret(value, secret),
+      keyValue: encryptSecret(value, secret),
+    })))
     .onConflictDoNothing()
     .run();
 
   return result.changes;
 }
 
-export function updateKey(db: Db, assetId: number, keyId: number, input: KeyStatusInput): AdminAsset | null {
+/**
+ * Encrypts keys that were stored before encryption existed, and gives them the
+ * fingerprint the duplicate check needs. Idempotent, so it runs on every start:
+ * a row that already has a fingerprint is skipped, and a row that is already
+ * ciphertext keeps that ciphertext — rewriting it would only swap one good value
+ * for another. Returns how many rows it rewrote.
+ */
+export function encryptLegacyKeys(db: Db, secret: string): number {
+  let migrated = 0;
+
+  for (const row of db.select().from(keys).all()) {
+    if (row.keyFingerprint !== null)
+      continue;
+
+    const alreadyEncrypted = isEncrypted(row.keyValue);
+    let plaintext: string;
+    if (alreadyEncrypted) {
+      try {
+        plaintext = decryptSecret(row.keyValue, secret);
+      }
+      catch {
+        // Written with another secret: leave it alone, the admin screen reports it as unreadable.
+        continue;
+      }
+    }
+    else {
+      plaintext = row.keyValue;
+    }
+
+    const fingerprint = fingerprintSecret(plaintext, secret);
+    const taken = db.select().from(keys).where(eq(keys.keyFingerprint, fingerprint)).get() !== undefined;
+
+    // The same key is already stored under that fingerprint, and the unique
+    // index only holds one: this copy is encrypted but stays unfingerprinted.
+    if (alreadyEncrypted && taken)
+      continue;
+
+    db.update(keys)
+      .set({
+        keyFingerprint: taken ? null : fingerprint,
+        keyValue: alreadyEncrypted ? row.keyValue : encryptSecret(plaintext, secret),
+      })
+      .where(eq(keys.id, row.id))
+      .run();
+    migrated++;
+  }
+
+  return migrated;
+}
+
+export function updateKey(db: Db, assetId: number, keyId: number, input: KeyStatusInput, secret: string): AdminAsset | null {
   const existing = db.select().from(keys).where(eq(keys.id, keyId)).get();
   if (!existing || existing.assetId !== assetId)
-    return adminAsset(db, assetId);
+    return adminAsset(db, assetId, secret);
 
   const assignedAt = input.status === 'assigned' ? existing.assignedAt ?? new Date() : null;
   const sentAt = input.status === 'sent' ? existing.sentAt ?? new Date() : null;
@@ -109,13 +168,13 @@ export function updateKey(db: Db, assetId: number, keyId: number, input: KeyStat
     .where(eq(keys.id, keyId))
     .run();
 
-  return adminAsset(db, assetId);
+  return adminAsset(db, assetId, secret);
 }
 
-export function deleteKey(db: Db, assetId: number, keyId: number): AdminAsset | null {
+export function deleteKey(db: Db, assetId: number, keyId: number, secret: string): AdminAsset | null {
   const existing = db.select().from(keys).where(eq(keys.id, keyId)).get();
   if (existing && existing.assetId === assetId)
     db.delete(keys).where(eq(keys.id, keyId)).run();
 
-  return adminAsset(db, assetId);
+  return adminAsset(db, assetId, secret);
 }

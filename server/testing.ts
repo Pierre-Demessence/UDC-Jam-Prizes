@@ -10,6 +10,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     adminPassword: 'test-password',
     cookieSecure: false,
     databasePath: undefined,
+    keyEncryptionSecret: 'test-key-encryption-secret-32-chars-plus',
     port: 3001,
     sessionSecret: 'test-session-secret-long-enough',
     ...overrides,

@@ -18,10 +18,10 @@ small Hono API and a SQLite database.
 
 Requires Node ≥ 23.6: the server runs on Node's native TypeScript support, so there is no `tsx`.
 
-First run: copy `.env.example` to `.env` and set `ADMIN_PASSWORD` and `SESSION_SECRET`. The dev and
-start scripts load `.env` themselves; a missing value stops the server with a readable message.
-`ADMIN_IP_ALLOWLIST` is optional and pins the admin side (login included) to known addresses.
-Run typecheck, lint, test and build before considering work done.
+First run: copy `.env.example` to `.env` and set `ADMIN_PASSWORD`, `KEY_ENCRYPTION_SECRET` and
+`SESSION_SECRET`. The dev and start scripts load `.env` themselves; a missing value stops the server
+with a readable message. `ADMIN_IP_ALLOWLIST` is optional and pins the admin side (login included) to
+known addresses. Run typecheck, lint, test and build before considering work done.
 
 ## Layout
 
@@ -31,8 +31,8 @@ Run typecheck, lint, test and build before considering work done.
 - `server/` — the API; `index.ts` (server + static `dist/`), `app.ts` (routes), `db.ts` (SQLite),
   `schema.ts` (the Drizzle tables), `repository.ts` (queries), `payloads.ts` (public and admin
   response shapes), `validate.ts` (input rules), `auth.ts` (session cookie + rate limits),
-  `config.ts` (environment), `unity.ts` + `unity-fetch.ts` (reading an Asset Store page);
-  `drizzle/` holds the generated SQL migrations.
+  `secrets.ts` (key encryption), `config.ts` (environment), `unity.ts` + `unity-fetch.ts` (reading an
+  Asset Store page); `drizzle/` holds the generated SQL migrations.
 - `server/fixtures/` — a captured Asset Store page the parser tests run against; refresh it with
   `node scripts/capture-fixtures.mjs`.
 - `data/` — the SQLite file at runtime; gitignored, never committed.
@@ -63,6 +63,10 @@ Run typecheck, lint, test and build before considering work done.
 - Private data (Discord handles, key values, internal notes) never leaves the API: public responses
   are shaped server-side from an explicit field list, so hiding fields in the UI is not the safeguard.
   `assets.notes` is private too — never hand a whole row to a public payload.
+- Key values are ciphertext at rest (`server/secrets.ts`, AES-256-GCM, key from
+  `KEY_ENCRYPTION_SECRET`): never write a key with a plain insert, and never compare `key_value` for
+  duplicates — encryption is randomised. `keys.key_fingerprint` is what recognises a repeated key, and
+  `encryptLegacyKeys` fills it in at startup for rows that predate encryption.
 - All writes go through Drizzle: `created_at` / `updated_at` are runtime defaults with no SQL
   `DEFAULT`, so a raw-SQL insert fails the `NOT NULL` constraint.
 - `PRAGMA foreign_keys` is per connection. Anything that does not go through `connectDatabase` —
