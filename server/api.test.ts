@@ -89,6 +89,21 @@ describe('the session endpoints', () => {
     expect(await response.json()).toEqual({ authenticated: false });
   });
 
+  it('stops honouring a cookie issued before the password changed', async () => {
+    const cookie = await signIn();
+    const rotated = createApp({
+      config: testConfig({ adminPassword: 'a-new-password' }),
+      fetchImpl: (async () => new Response(fixture, { status: 200 })) as typeof fetch,
+      handle,
+    });
+
+    const session = await rotated.request('/api/session', { headers: { cookie } });
+    const admin = await rotated.request('/api/admin/assets', { headers: { cookie } });
+
+    expect(await session.json()).toEqual({ authenticated: false });
+    expect(admin.status).toBe(401);
+  });
+
   it('stops answering after too many wrong passwords', async () => {
     for (let attempt = 0; attempt < 10; attempt++)
       await app.request('/api/session', json({ password: 'nope' }));

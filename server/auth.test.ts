@@ -1,10 +1,31 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
-import { createRateLimiter, createSessionToken, passwordMatches, verifySessionToken } from './auth.ts';
+import { createRateLimiter, createSessionToken, deriveSessionKey, passwordMatches, verifySessionToken } from './auth.ts';
 
 const SECRET = 'a-test-session-secret-long-enough';
 const NOW = 1_700_000_000_000;
+
+const PASSWORD = 'correct horse';
+
+describe('the session key', () => {
+  it('is stable for one secret and password', () => {
+    expect(deriveSessionKey(SECRET, PASSWORD)).toBe(deriveSessionKey(SECRET, PASSWORD));
+  });
+
+  it('changes with the password, so a cookie from before stops verifying', () => {
+    const token = createSessionToken(deriveSessionKey(SECRET, PASSWORD), NOW);
+
+    expect(verifySessionToken(deriveSessionKey(SECRET, `${PASSWORD} (changed)`), token, NOW)).toBe(false);
+  });
+
+  it('changes with the session secret too', () => {
+    const key = deriveSessionKey(SECRET, PASSWORD);
+    const other = deriveSessionKey('another-session-secret-long', PASSWORD);
+
+    expect(key).not.toBe(other);
+  });
+});
 
 describe('session tokens', () => {
   it('accepts a token it has just signed', () => {

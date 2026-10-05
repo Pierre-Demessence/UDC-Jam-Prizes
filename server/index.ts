@@ -9,6 +9,7 @@ import { createApp } from './app.ts';
 import { ConfigError, readConfig } from './config.ts';
 import { connectDatabase } from './db.ts';
 import { encryptLegacyKeys } from './repository.ts';
+import { gracefulShutdown } from './shutdown.ts';
 
 let config: Config;
 try {
@@ -50,11 +51,15 @@ const server = serve({ fetch: app.fetch, port: config.port }, (info) => {
   console.log(`API listening on http://localhost:${info.port}`);
 });
 
-function shutdown(): void {
-  server.close();
-  handle.close();
-  process.exit(0);
-}
+// Stop taking connections, let the requests in flight finish, then close the
+// database: a deploy's SIGTERM must not cut a response in half.
+const shutdown = gracefulShutdown({
+  server,
+  finish: () => {
+    handle.close();
+    process.exit(0);
+  },
+});
 
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);

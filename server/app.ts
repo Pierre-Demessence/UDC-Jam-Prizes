@@ -11,6 +11,7 @@ import type { DatabaseHandle } from './db.ts';
 import {
   createRateLimiter,
   createSessionToken,
+  deriveSessionKey,
   passwordMatches,
   rateLimits,
   SESSION_COOKIE,
@@ -76,6 +77,9 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
   const db = handle.db;
   // Admin payloads carry key values, which are decrypted on the way out.
   const { keyEncryptionSecret } = config;
+  // Derived once: it is what the session cookie is signed with, so a changed
+  // password stops every cookie issued under the old one from verifying.
+  const sessionKey = deriveSessionKey(config.sessionSecret, config.adminPassword);
   const importLimiter = createRateLimiter(rateLimits.import);
   const loginLimiter = createRateLimiter(rateLimits.login);
   const metadataLimiter = createRateLimiter(rateLimits.metadata);
@@ -129,7 +133,7 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
   app.use('/api/admin/*', gateAddress);
 
   function authenticated(c: Context): boolean {
-    return verifySessionToken(config.sessionSecret, getCookie(c, SESSION_COOKIE));
+    return verifySessionToken(sessionKey, getCookie(c, SESSION_COOKIE));
   }
 
   function requireAdmin(c: Context): Response | null {
@@ -161,7 +165,7 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
       return c.json({ error: 'Wrong password.' }, 401);
 
     loginLimiter.reset(clientKey(c.env));
-    setCookie(c, SESSION_COOKIE, createSessionToken(config.sessionSecret), {
+    setCookie(c, SESSION_COOKIE, createSessionToken(sessionKey), {
       httpOnly: true,
       maxAge: Math.round(SESSION_TTL_MS / 1000),
       path: '/',

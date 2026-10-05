@@ -109,12 +109,13 @@ every `<meta>` tag and the JSON-LD blocks verbatim — so the tests stay honest 
 ## Admin auth: one password, no session table
 
 `ADMIN_PASSWORD` comes from the environment and is compared in constant time; on success the cookie
-carries an expiry plus its HMAC (`SESSION_SECRET`), `HttpOnly`, `SameSite=Strict`, and `Secure` in
-production. Login attempts are limited per client address, in memory. Rejected: an auth framework or a
-session table — there is exactly one admin and no user records to keep, so the whole gate is thirty
-lines. Two accepted consequences, both in `docs/backlog.md`: the limiter resets when the process
-restarts, and changing the password does not invalidate a cookie already issued (they expire within
-twelve hours).
+carries an expiry plus its HMAC, `HttpOnly`, `SameSite=Strict`, and `Secure` in production. That HMAC
+key is derived from `SESSION_SECRET` **and the password**, so changing the password ends every session
+already issued — the moment revoking them matters — instead of leaving a cookie valid for its full
+twelve hours. Login attempts are limited per client address, in memory. Rejected: an auth framework or
+a session table — there is exactly one admin and no user records to keep, so the whole gate is thirty
+lines, and the derived key is what a session table would otherwise be needed for. One accepted
+consequence, in `docs/backlog.md`: the limiter resets when the process restarts.
 
 ## A batch of links is read on the server, a few at a time
 
@@ -126,6 +127,14 @@ crawl of somebody else's site — which is also why the links are fetched server
 fetch of the Asset Store is blocked by CORS, as the app's own testing confirmed).
 
 Rejected: a CSV import of the old spreadsheet — links are what the admin actually has.
+
+## Shutdown waits for the requests in flight
+
+On SIGTERM the process stops taking new connections, closes the idle keep-alive sockets, and lets the
+requests already running finish before the database is closed and the process exits. A 10 s backstop
+drops whatever is left, and a second signal means "now". The Deployment's 30 s grace is the real
+limit: this makes the pod use it instead of cutting a response in half. Rejected: exiting at once,
+which dropped a response mid-write on every deploy.
 
 ## The admin can be pinned to known addresses
 

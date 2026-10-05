@@ -17,7 +17,8 @@ npm run dev
 `npm run dev` starts the client on <http://localhost:5173> and the API on
 <http://localhost:3001> (proxied under `/api`). The SQLite file is created in `data/` on first run.
 
-`ADMIN_PASSWORD` is the admin login; `SESSION_SECRET` (16+ characters) signs the session cookie.
+`ADMIN_PASSWORD` is the admin login; `SESSION_SECRET` (16+ characters) signs the session cookie
+together with it, so changing either one ends the sessions already issued.
 `KEY_ENCRYPTION_SECRET` (32+ characters) encrypts donated key values at rest, so a copy of the
 SQLite file is useless without it: keep it safe, it is the only thing that can open the stored keys.
 All three are read from `.env`, which is gitignored. `npm start` runs one process serving the built

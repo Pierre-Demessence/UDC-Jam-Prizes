@@ -23,20 +23,31 @@ function sign(secret: string, value: string): string {
 }
 
 /**
- * The cookie holds only an expiry and its HMAC: the password never travels to
- * the client, and a tampered expiry cannot be re-signed without the secret.
+ * The key session cookies are signed with. Deriving it from the admin password as
+ * well as `SESSION_SECRET` means changing the password ends every session already
+ * issued — the moment revoking them matters — without a session table: an old
+ * cookie simply stops verifying. The password stays hidden (an HMAC is one-way),
+ * and guessing it offline needs `SESSION_SECRET`, which a stolen cookie is not.
  */
-export function createSessionToken(secret: string, now = Date.now(), ttlMs = SESSION_TTL_MS): string {
-  const expiry = String(now + ttlMs);
-  return `${expiry}.${sign(secret, expiry)}`;
+export function deriveSessionKey(sessionSecret: string, adminPassword: string): string {
+  return sign(sessionSecret, adminPassword);
 }
 
-export function verifySessionToken(secret: string, token: string | undefined, now = Date.now()): boolean {
+/**
+ * The cookie holds only an expiry and its HMAC: the password never travels to
+ * the client, and a tampered expiry cannot be re-signed without the key.
+ */
+export function createSessionToken(key: string, now = Date.now(), ttlMs = SESSION_TTL_MS): string {
+  const expiry = String(now + ttlMs);
+  return `${expiry}.${sign(key, expiry)}`;
+}
+
+export function verifySessionToken(key: string, token: string | undefined, now = Date.now()): boolean {
   if (!token)
     return false;
 
   const [expiry, signature] = token.split('.');
-  if (!expiry || !signature || !sameSecret(signature, sign(secret, expiry)))
+  if (!expiry || !signature || !sameSecret(signature, sign(key, expiry)))
     return false;
 
   const expiresAt = Number.parseInt(expiry, 10);
