@@ -16,9 +16,24 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
       - run: npm ci
       - run: npm run lint
       - run: npm test
       - run: npm run build
+      # The server runs on Node's TypeScript support, which lint, test and build
+      # never exercise: this is the step that would catch a runtime that cannot
+      # start the app.
+      - name: Check the server starts and answers
+        env:
+          ADMIN_PASSWORD: ci-password
+          SESSION_SECRET: ci-session-secret-long-enough
+        run: |
+          npm start &
+          for attempt in {1..20}; do
+            if curl -fsS http://localhost:3001/api/health; then exit 0; fi
+            sleep 0.5
+          done
+          echo "the server never answered" >&2
+          exit 1
