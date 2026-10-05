@@ -68,7 +68,6 @@ export function Gallery() {
     <div className="page">
       <header className="site-header">
         <div>
-          <p className="eyebrow">Prize catalogue</p>
           <h1>{brand.name}</h1>
         </div>
       </header>
