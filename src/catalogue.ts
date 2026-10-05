@@ -2,7 +2,7 @@ import type { PublicAsset } from '../server/payloads.ts';
 
 /** Searching, filtering and sorting the public list. Pure, so it is testable. */
 
-export type SortKey = 'name' | 'price-asc' | 'price-desc';
+export type SortKey = 'author' | 'name';
 
 export interface Filters {
   category: string;
@@ -13,9 +13,8 @@ export interface Filters {
 export const DEFAULT_FILTERS: Filters = { category: '', query: '', sort: 'name' };
 
 export const SORT_LABELS: Record<SortKey, string> = {
-  'name': 'Name',
-  'price-asc': 'Price, cheapest first',
-  'price-desc': 'Price, dearest first',
+  name: 'Name',
+  author: 'Author',
 };
 
 export function categoriesOf(assets: PublicAsset[]): string[] {
@@ -33,16 +32,16 @@ function matchesQuery(asset: PublicAsset, query: string): boolean {
   return haystack.includes(query);
 }
 
-/** A missing price sorts last in both directions: it is not a cheap asset. */
-function byPrice(left: PublicAsset, right: PublicAsset, direction: 1 | -1): number {
-  if (left.priceCents === null || right.priceCents === null) {
-    if (left.priceCents === right.priceCents)
+/** Authors sort by name, and a prize whose author is unknown sorts last. */
+function byAuthor(left: PublicAsset, right: PublicAsset): number {
+  if (left.publisher === null || right.publisher === null) {
+    if (left.publisher === right.publisher)
       return left.name.localeCompare(right.name);
 
-    return left.priceCents === null ? 1 : -1;
+    return left.publisher === null ? 1 : -1;
   }
 
-  return (left.priceCents - right.priceCents) * direction || left.name.localeCompare(right.name);
+  return left.publisher.localeCompare(right.publisher) || left.name.localeCompare(right.name);
 }
 
 export function filterAssets(assets: PublicAsset[], filters: Filters): PublicAsset[] {
@@ -52,10 +51,7 @@ export function filterAssets(assets: PublicAsset[], filters: Filters): PublicAss
     && (query === '' || matchesQuery(asset, query)),
   );
 
-  return filtered.sort((left, right) => {
-    if (filters.sort === 'name')
-      return left.name.localeCompare(right.name);
-
-    return byPrice(left, right, filters.sort === 'price-asc' ? 1 : -1);
-  });
+  return filtered.sort((left, right) =>
+    filters.sort === 'author' ? byAuthor(left, right) : left.name.localeCompare(right.name),
+  );
 }
