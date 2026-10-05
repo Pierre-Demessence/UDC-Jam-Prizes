@@ -42,7 +42,7 @@ export interface ContactInput {
   discordHandle: string;
 }
 
-export const KEY_STATUSES = ['available', 'assigned', 'sent', 'revoked'] as const;
+export const KEY_STATUSES = ['available', 'sent'] as const;
 
 export type KeyStatus = (typeof KEY_STATUSES)[number];
 
@@ -206,7 +206,7 @@ export function parseKeyStatusInput(body: unknown): Validation<KeyStatusInput> {
   if (!KEY_STATUSES.includes(status.value as KeyStatus))
     return { error: `The status must be one of: ${KEY_STATUSES.join(', ')}.`, ok: false };
 
-  if ((status.value === 'assigned' || status.value === 'sent') && assignedTo.value === null)
+  if (status.value === 'sent' && assignedTo.value === null)
     return { error: 'Say who the key is for, or mark it available again.', ok: false };
 
   return { ok: true, value: { assignedTo: assignedTo.value, status: status.value as KeyStatus } };

@@ -34,7 +34,6 @@ export interface PublicCatalogue {
 
 export interface AdminKey {
   id: number;
-  assignedAt: string | null;
   assignedTo: string | null;
   keyValue: string;
   sentAt: string | null;
@@ -95,7 +94,6 @@ export function toAdminAsset(asset: Asset, contact: Contact | null, keys: Key[],
     updatedAt: asset.updatedAt.toISOString(),
     keys: keys.map(key => ({
       id: key.id,
-      assignedAt: toIso(key.assignedAt),
       assignedTo: key.assignedTo,
       keyValue: readableKeyValue(key.keyValue, secret),
       sentAt: toIso(key.sentAt),

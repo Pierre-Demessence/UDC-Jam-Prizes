@@ -325,27 +325,27 @@ describe('the keys behind a prize', () => {
     expect(body.assets.find(a => a.id === assetId)?.keys[0].keyValue).toMatch(/unreadable/);
   });
 
-  it('assigns a key to a winner', async () => {
+  it('marks a key as sent to a winner', async () => {
     const cookie = await signIn();
     const { assetId, keyId } = await assetWithKeys(cookie);
 
     const response = await app.request(`/api/admin/assets/${assetId}/keys/${keyId}`, {
-      body: JSON.stringify({ assignedTo: 'Winner One', status: 'assigned' }),
+      body: JSON.stringify({ assignedTo: 'Winner One', status: 'sent' }),
       headers: { 'content-type': 'application/json', cookie },
       method: 'PATCH',
     });
-    const body = await response.json() as { asset: { keys: { assignedAt: string | null; assignedTo: string | null }[] } };
+    const body = await response.json() as { asset: { keys: { assignedTo: string | null; sentAt: string | null }[] } };
     const key = body.asset.keys[0];
 
-    expect(key.assignedAt).not.toBeNull();
+    expect(key.sentAt).not.toBeNull();
     expect(key.assignedTo).toBe('Winner One');
   });
 
-  it('refuses an assignment with no winner', async () => {
+  it('refuses sending a key with no winner', async () => {
     const cookie = await signIn();
     const { assetId, keyId } = await assetWithKeys(cookie);
     const response = await app.request(`/api/admin/assets/${assetId}/keys/${keyId}`, {
-      body: JSON.stringify({ status: 'assigned' }),
+      body: JSON.stringify({ status: 'sent' }),
       headers: { 'content-type': 'application/json', cookie },
       method: 'PATCH',
     });
@@ -353,16 +353,19 @@ describe('the keys behind a prize', () => {
     expect(response.status).toBe(400);
   });
 
-  it('refuses a status it does not know', async () => {
+  it('refuses a status it does not know, including the ones the app dropped', async () => {
     const cookie = await signIn();
     const { assetId, keyId } = await assetWithKeys(cookie);
-    const response = await app.request(`/api/admin/assets/${assetId}/keys/${keyId}`, {
-      body: JSON.stringify({ status: 'eaten' }),
-      headers: { 'content-type': 'application/json', cookie },
-      method: 'PATCH',
-    });
 
-    expect(response.status).toBe(400);
+    for (const status of ['eaten', 'assigned', 'revoked']) {
+      const response = await app.request(`/api/admin/assets/${assetId}/keys/${keyId}`, {
+        body: JSON.stringify({ assignedTo: 'Winner One', status }),
+        headers: { 'content-type': 'application/json', cookie },
+        method: 'PATCH',
+      });
+
+      expect(response.status, status).toBe(400);
+    }
   });
 
   it('stores the contact of the author without publishing it', async () => {
@@ -418,21 +421,6 @@ describe('editing a prize onto another prize\'s identity', () => {
 
     expect(response.status).toBe(200);
     expect(((await response.json()) as { asset: { name: string } }).asset.name).toBe('Text Animator, renamed');
-  });
-
-  it('refuses to mark a key as sent with no winner', async () => {
-    const cookie = await signIn();
-    const asset = await addAsset(cookie);
-    const added = await app.request(`/api/admin/assets/${asset.id}/keys`, json({ keys: 'KEY-1' }, cookie));
-    const keyId = ((await added.json()) as { asset: { keys: { id: number }[] } }).asset.keys[0].id;
-
-    const response = await app.request(`/api/admin/assets/${asset.id}/keys/${keyId}`, {
-      body: JSON.stringify({ status: 'sent' }),
-      headers: { 'content-type': 'application/json', cookie },
-      method: 'PATCH',
-    });
-
-    expect(response.status).toBe(400);
   });
 });
 

@@ -161,6 +161,17 @@ last in **both** directions, because an unpriced asset is not "the cheapest", an
 name so the order never wobbles between renders. The column shows a ▲/▼ glyph and carries `aria-sort`,
 so the direction is never colour alone.
 
+## A key is available or sent
+
+A donated key is either in stock or already with a winner, so those are the only two states. The two
+others were dropped: "assigned" duplicated "sent" with a second timestamp nobody looked at, and
+"revoked" was never used, because a jam hands keys out rather than takes them back. Marking a key sent
+requires a winner, so no key can claim to have gone somewhere without saying where.
+
+`keys.assigned_at` stays in the schema although nothing writes it any more (`docs/backlog.md` tracks
+dropping it): `sent_at` is the only date this model needs, but dropping the column would discard the
+dates recorded on rows written while the old status existed.
+
 ## One switch instead of a router
 
 `App.tsx` chooses between the gallery and the admin from `location.pathname`, and follows `popstate`.

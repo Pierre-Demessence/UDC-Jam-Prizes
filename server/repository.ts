@@ -160,11 +160,11 @@ export function updateKey(db: Db, assetId: number, keyId: number, input: KeyStat
   if (!existing || existing.assetId !== assetId)
     return adminAsset(db, assetId, secret);
 
-  const assignedAt = input.status === 'assigned' ? existing.assignedAt ?? new Date() : null;
+  // A key is available or sent; `sentAt` records when it reached a winner.
   const sentAt = input.status === 'sent' ? existing.sentAt ?? new Date() : null;
 
   db.update(keys)
-    .set({ assignedAt, assignedTo: input.status === 'available' ? null : input.assignedTo, sentAt, status: input.status })
+    .set({ assignedTo: input.status === 'available' ? null : input.assignedTo, sentAt, status: input.status })
     .where(eq(keys.id, keyId))
     .run();
 

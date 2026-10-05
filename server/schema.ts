@@ -57,6 +57,8 @@ export const contacts = sqliteTable('contacts', {
  */
 export const keys = sqliteTable('keys', {
   id: integer('id').primaryKey({ autoIncrement: true }),
+  // Kept for rows written before a key was only ever available or sent; nothing
+  // reads or writes it, `sentAt` is the day the key reached its winner.
   assignedAt: integer('assigned_at', { mode: 'timestamp_ms' }),
   assignedTo: text('assigned_to'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
@@ -66,7 +68,7 @@ export const keys = sqliteTable('keys', {
   assetId: integer('asset_id')
     .notNull()
     .references(() => assets.id, { onDelete: 'cascade' }),
-  status: text('status', { enum: ['available', 'assigned', 'sent', 'revoked'] })
+  status: text('status', { enum: ['available', 'sent'] })
     .notNull()
     .default('available'),
 }, table => [

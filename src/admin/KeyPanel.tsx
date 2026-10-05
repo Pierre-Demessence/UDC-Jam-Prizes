@@ -6,9 +6,7 @@ import type { AdminAsset } from '../../server/payloads.ts';
 import type { KeyStatus } from '../../server/validate.ts';
 
 const STATUS_LABELS: Record<KeyStatus, string> = {
-  assigned: '● assigned',
   available: '○ available',
-  revoked: '✕ revoked',
   sent: '✓ sent',
 };
 
@@ -42,7 +40,7 @@ function KeyRow({ asset, onChanged, record }: {
     }
   }
 
-  const needsWinner = status === 'assigned' || status === 'sent';
+  const needsWinner = status === 'sent';
 
   return (
     <li className="key-row">
@@ -54,7 +52,7 @@ function KeyRow({ asset, onChanged, record }: {
         aria-label="Winner"
         disabled={!needsWinner}
         onChange={event => setWinner(event.target.value)}
-        placeholder={needsWinner ? 'winner name' : 'not assigned'}
+        placeholder={needsWinner ? 'winner name' : 'no winner yet'}
         value={winner}
       />
       <button className="button-small" onClick={() => void save()} type="button">Update</button>
@@ -99,7 +97,7 @@ export function KeyPanel({ asset, onChanged }: { asset: AdminAsset; onChanged: (
     }
   }
 
-  const assigned = asset.keys.filter(key => key.status === 'assigned' || key.status === 'sent').length;
+  const sent = asset.keys.filter(key => key.status === 'sent').length;
 
   return (
     <div className="key-panel">
@@ -133,7 +131,7 @@ export function KeyPanel({ asset, onChanged }: { asset: AdminAsset; onChanged: (
         <p className="hint">
           {asset.keys.length === 0
             ? 'No keys stored yet.'
-            : `${assigned} of ${asset.keys.length} keys given to a winner.`}
+            : `${sent} of ${asset.keys.length} keys given to a winner.`}
         </p>
       </div>
 
