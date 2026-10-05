@@ -144,8 +144,15 @@ the proxies whose `X-Forwarded-For` counts (the walk is in `AGENTS.md`); it neve
 only lets a listed proxy name the caller. List the ingress that sets the header, not a whole pod
 network. Empty trusts nobody.
 
-Rejected: pinning the admin at the edge in the cluster — it would bar the admin from every network but
-the listed one, so both variables stay unset there.
+In the cluster that pin lives at the edge instead (`k8s/prod/ingress-admin.yaml`, admin paths only): the
+edge sees the real client, where the app would see the proxy, and it is the one place a *path* can be
+restricted — the middleware attaches to a router, not to a path inside one, which is why the admin has
+its own Ingress rather than another path in the gallery's. Accepted consequence: the admin stops working
+from any network but the listed ones, and the way back in is the middleware in the GitOps repository.
+
+Rejected: also setting `ADMIN_IP_ALLOWLIST` in the cluster. It matches the socket address, so behind
+Traefik it would see one address for every visitor — an in-app second rule where the edge already
+decides.
 
 ## Key values are encrypted at rest
 
@@ -222,5 +229,6 @@ Secrets rather than a Kubernetes Secret committed to the GitOps repository, whic
 `KEY_ENCRYPTION_SECRET` is irreplaceable, so the 1Password entry, not a volume snapshot, is what makes
 a restored volume readable.
 
-`ADMIN_IP_ALLOWLIST` and `TRUSTED_PROXY_ALLOWLIST` stay unset in the cluster (see "The admin can be
+`TRUSTED_PROXY_ALLOWLIST` is set to the node's pod range, so the app reads the caller the ingress named;
+`ADMIN_IP_ALLOWLIST` stays unset because the pin lives at the edge instead (see "The admin can be
 pinned to known addresses").

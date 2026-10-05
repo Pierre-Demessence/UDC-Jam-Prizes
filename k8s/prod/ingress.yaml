@@ -9,6 +9,9 @@ metadata:
     environment: prod
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
+    # A flood is answered here, before it reaches the pod; the admin router is
+    # pinned by address instead (ingress-admin.yaml).
+    traefik.ingress.kubernetes.io/router.middlewares: default-rate-limit@kubernetescrd
 spec:
   tls:
     - hosts:

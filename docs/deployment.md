@@ -63,7 +63,13 @@ restore window. Two things are specific to this database:
   address comes from. Each further node needs its own range added, or the app goes back to reading
   every visitor as the proxy — one shared rate-limit key, and the login limiter spending everyone's
   budget at once.
-- `ADMIN_IP_ALLOWLIST` is deliberately unset: the app sits behind Traefik, so pinning the admin is a job
-  for an edge `ipAllowList` middleware rather than the app itself (`docs/decisions.md`).
+- The admin is pinned at the edge: `k8s/prod/ingress-admin.yaml` routes `/admin`, `/api/admin`,
+  `/api/session` and `/api/metadata` through Traefik's `default-ip-allowlist` middleware, while the
+  gallery's own Ingress stays open. `ADMIN_IP_ALLOWLIST` is unset because the edge is both the accurate
+  and the only per-path place to do it (`docs/decisions.md`). The middleware's `sourceRange` holds a
+  single address — from any other network the admin refuses you, and the way back in is editing that
+  middleware in the GitOps repository.
 - One replica with `Recreate` is on purpose: SQLite is a single writer on a `ReadWriteOnce` volume
   (`docs/decisions.md`).
+- The gallery's Ingress carries Traefik's rate limit, so a `429` at the edge is Traefik refusing load,
+  not the app refusing a request — the app limits logins only.

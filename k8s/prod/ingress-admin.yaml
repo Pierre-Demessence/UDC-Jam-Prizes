@@ -1,0 +1,57 @@
+# The admin is reachable only from the addresses Traefik's ipAllowList middleware
+# allows; the gallery keeps its own unpinned Ingress on the same host. The
+# annotation attaches to a router, not to a path inside one, which is why this is
+# a second Ingress rather than more paths in ingress.yaml.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: jam-prizes-admin
+  namespace: jam-prizes-prod
+  labels:
+    app.kubernetes.io/name: jam-prizes
+    app.kubernetes.io/part-of: jam-prizes
+    environment: prod
+  annotations:
+    # The middleware lives in the `default` namespace, hence the prefix and the
+    # provider suffix.
+    traefik.ingress.kubernetes.io/router.middlewares: default-ip-allowlist@kubernetescrd
+spec:
+  # The same certificate the gallery's Ingress names. cert-manager owns that
+  # Secret from there, so this one asks for no certificate of its own.
+  tls:
+    - hosts:
+        - prizes.jam.udc.ovh
+      secretName: jam-prizes-tls
+  rules:
+    - host: prizes.jam.udc.ovh
+      http:
+        paths:
+          # The admin screen and the three route groups the app itself gates.
+          - path: /admin
+            pathType: Prefix
+            backend:
+              service:
+                name: jam-prizes
+                port:
+                  number: 80
+          - path: /api/admin
+            pathType: Prefix
+            backend:
+              service:
+                name: jam-prizes
+                port:
+                  number: 80
+          - path: /api/session
+            pathType: Prefix
+            backend:
+              service:
+                name: jam-prizes
+                port:
+                  number: 80
+          - path: /api/metadata
+            pathType: Prefix
+            backend:
+              service:
+                name: jam-prizes
+                port:
+                  number: 80
