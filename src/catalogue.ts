@@ -1,3 +1,5 @@
+import { compareOptional } from '@/sort';
+
 import type { PublicAsset } from '../server/payloads.ts';
 
 /** Searching, filtering and sorting the public list. Pure, so it is testable. */
@@ -34,14 +36,8 @@ function matchesQuery(asset: PublicAsset, query: string): boolean {
 
 /** Authors sort by name, and a prize whose author is unknown sorts last. */
 function byAuthor(left: PublicAsset, right: PublicAsset): number {
-  if (left.publisher === null || right.publisher === null) {
-    if (left.publisher === right.publisher)
-      return left.name.localeCompare(right.name);
-
-    return left.publisher === null ? 1 : -1;
-  }
-
-  return left.publisher.localeCompare(right.publisher) || left.name.localeCompare(right.name);
+  return compareOptional(left.publisher, right.publisher, (a, b) => a.localeCompare(b))
+    || left.name.localeCompare(right.name);
 }
 
 export function filterAssets(assets: PublicAsset[], filters: Filters): PublicAsset[] {

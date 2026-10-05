@@ -443,54 +443,118 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
-/* Admin list */
+/* Admin table */
 
-.admin-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.admin-row {
-  padding: 14px 16px;
+.table-scroll {
+  overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
 }
 
-.admin-row-main {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.admin-table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  font-size: 0.9rem;
 }
 
-.admin-row-title {
-  display: flex;
-  gap: 10px;
-  align-items: baseline;
-  flex-wrap: wrap;
-  font-weight: 600;
-}
-
-.admin-row-meta {
-  display: flex;
-  gap: 14px;
-  flex-wrap: wrap;
-  margin: 0;
+.table-caption {
+  padding: 10px 12px 0;
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-align: left;
+  text-transform: uppercase;
 }
 
-.admin-row-actions {
+.admin-table th,
+.admin-table td {
+  padding: 9px 12px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-table tbody tr:last-child th,
+.admin-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.admin-table thead th {
+  padding: 0;
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--border-strong);
+  white-space: nowrap;
+}
+
+.table-sort {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.admin-table th.cell-number .table-sort {
+  justify-content: flex-end;
+}
+
+.table-sort:hover {
+  color: var(--accent);
+}
+
+.sort-mark {
+  color: var(--text-muted);
+  font-size: 0.7rem;
+}
+
+.admin-table [aria-sort="ascending"] .sort-mark,
+.admin-table [aria-sort="descending"] .sort-mark {
+  color: var(--accent);
+}
+
+.admin-table tbody tr:hover {
+  background: var(--surface-2);
+}
+
+/* One line per cell, so rows stay short; the table scrolls sideways instead of
+   wrapping short values like a category or an author. Only the name wraps. */
+.admin-table tbody td {
+  white-space: nowrap;
+}
+
+.cell-name {
+  font-weight: 600;
+  min-width: 240px;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.cell-number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Width 1% is the usual way to say "as narrow as the buttons inside": without
+   it the three buttons claim the space the names and categories need. */
+.cell-actions {
+  white-space: nowrap;
+  width: 1%;
+}
+
+.row-keys th,
+.row-keys td {
+  padding: 0 12px 14px;
+  background: var(--surface-2);
+  white-space: normal;
 }
 
 .confirm-delete {

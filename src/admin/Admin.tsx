@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 
 import { AssetForm } from '@/admin/AssetForm';
+import { AssetTable } from '@/admin/AssetTable';
 import { BulkImport } from '@/admin/BulkImport';
-import { KeyPanel } from '@/admin/KeyPanel';
 import { api } from '@/api';
-import { formatPrice } from '@/format';
 
 import type { ImportOutcome } from '../../server/import-assets.ts';
 import type { AdminAsset } from '../../server/payloads.ts';
@@ -215,81 +214,20 @@ export function Admin() {
               {assets.length === 0
                 ? <p className="notice">Nothing yet. Paste an Asset Store URL to add the first prize.</p>
                 : (
-                    <ul className="admin-list">
-                      {assets.map(asset => (
-                        <li className="admin-row" key={asset.id}>
-                          <div className="admin-row-main">
-                            <div className="admin-row-title">
-                              <a href={asset.assetUrl} rel="noreferrer" target="_blank">{asset.name}</a>
-                              {asset.publisher === null
-                                ? null
-                                : <span className="muted">{`by ${asset.publisher}`}</span>}
-                            </div>
-                            <p className="admin-row-meta">
-                              <span title="Read from the Asset Store page; edit it if it is wrong.">
-                                {formatPrice(asset.priceCents, asset.currency)}
-                              </span>
-                              <span title="Keys are private; winners only see the asset.">
-                                {asset.keys.length}
-                                {' '}
-                                {asset.keys.length === 1 ? 'key' : 'keys'}
-                              </span>
-                              <span title="Discord handle and notes are private.">
-                                {asset.contact === null ? 'no contact yet' : asset.contact.discordHandle}
-                              </span>
-                            </p>
-                          </div>
-
-                          <div className="admin-row-actions">
-                            <button
-                              className="button-small"
-                              onClick={() => {
-                                setImporting(false);
-                                setDraft({ editing: asset, metadata: null });
-                              }}
-                              type="button"
-                            >
-                              Edit
-                            </button>
-                            <button
-                              aria-expanded={openPanel === asset.id}
-                              className="button-small"
-                              onClick={() => setOpenPanel(openPanel === asset.id ? null : asset.id)}
-                              type="button"
-                            >
-                              Author &amp; keys
-                            </button>
-                            {confirmingId === asset.id
-                              ? (
-                                  <span className="confirm-delete">
-                                    <span>Delete this prize and its keys?</span>
-                                    <button
-                                      className="button-small button-danger"
-                                      onClick={() => void remove(asset)}
-                                      type="button"
-                                    >
-                                      Yes, delete
-                                    </button>
-                                    <button className="button-small" onClick={() => setConfirmingId(null)} type="button">
-                                      Keep it
-                                    </button>
-                                  </span>
-                                )
-                              : (
-                                  <button
-                                    className="button-small button-danger"
-                                    onClick={() => setConfirmingId(asset.id)}
-                                    type="button"
-                                  >
-                                    Delete
-                                  </button>
-                                )}
-                          </div>
-
-                          {openPanel === asset.id ? <KeyPanel asset={asset} onChanged={mergeAsset} /> : null}
-                        </li>
-                      ))}
-                    </ul>
+                    <AssetTable
+                      assets={assets}
+                      confirmingId={confirmingId}
+                      onAskDelete={setConfirmingId}
+                      onAssetChanged={mergeAsset}
+                      onCancelDelete={() => setConfirmingId(null)}
+                      onDelete={asset => void remove(asset)}
+                      onEdit={(asset) => {
+                        setImporting(false);
+                        setDraft({ editing: asset, metadata: null });
+                      }}
+                      onToggleKeys={id => setOpenPanel(openPanel === id ? null : id)}
+                      openKeys={openPanel}
+                    />
                   )}
             </>
           )}

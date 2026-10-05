@@ -146,6 +146,21 @@ in clear, and the public payload has no key fields at all. Rejected: storing key
 encrypted file (one more thing to back up, no gain) and a passphrase-derived key entered at start-up
 (the server would sit waiting for a human).
 
+## The admin list is a table, sorted by hand
+
+The admin is a tool, not a shop window: what matters is seeing every prize and its state at once. The
+list is therefore a table — one row per prize, one column per fact (prize, author, category, price,
+keys, contact) — rather than a card per prize, which spent three lines of vertical space per asset and
+hid the columns that could be compared. Keys and the author's contact stay behind a row's own panel: a
+status select per key does not belong in a cell.
+
+Every column sorts, and sorting is thirty lines of plain code (`src/admin/asset-table.ts`), so no table
+library was added; the alternative would have been a dependency for what one comparator per column
+does. The rules match the public gallery: a missing value — no author, no price, no contact — sorts
+last in **both** directions, because an unpriced asset is not "the cheapest", and a tie breaks on the
+name so the order never wobbles between renders. The column shows a ▲/▼ glyph and carries `aria-sort`,
+so the direction is never colour alone.
+
 ## One switch instead of a router
 
 `App.tsx` chooses between the gallery and the admin from `location.pathname`, and follows `popstate`.

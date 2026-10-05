@@ -49,6 +49,7 @@ client and the API, which is what a deployment would run.
 - **Admin** (`/admin`) — sign in with `ADMIN_PASSWORD`, paste an Asset Store URL and have the name,
   image, publisher, category, price and Unity id filled in from the page, keep the author's Discord
   handle and internal notes, and paste the keys the author sends to record who received which one.
+  The prize list is a table — every column sorts, and each row opens its own keys and contact.
   *Paste several links* adds a whole batch at once (up to 20, read a few at a time), reporting per
   link whether it was added, already there, or unreadable. Key values are encrypted on the way in and
   decrypted for the admin screen only; they never leave the server in a public response.
