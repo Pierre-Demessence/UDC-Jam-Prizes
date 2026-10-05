@@ -245,3 +245,15 @@ export function parseNeededInput(body: unknown): Validation<{ needed: number }> 
 
   return { ok: true, value: { needed } };
 }
+
+/** The admin table's Hide/Unhide button: a boolean and nothing else. */
+export function parseHiddenInput(body: unknown): Validation<{ hidden: boolean }> {
+  if (typeof body !== 'object' || body === null)
+    return { error: 'Expected a JSON object.', ok: false };
+
+  const raw = (body as { hidden?: unknown }).hidden;
+  if (typeof raw !== 'boolean')
+    return { error: 'Hidden must be true or false.', ok: false };
+
+  return { ok: true, value: { hidden: raw } };
+}

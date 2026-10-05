@@ -18,6 +18,7 @@ interface AssetTableProps {
   onDelete: (asset: AdminAsset) => void;
   onEdit: (asset: AdminAsset) => void;
   onSetNeeded: (asset: AdminAsset, needed: number) => Promise<void>;
+  onToggleHidden: (asset: AdminAsset) => void;
   onToggleKeys: (id: number) => void;
 }
 
@@ -91,6 +92,7 @@ export function AssetTable({
   onDelete,
   onEdit,
   onSetNeeded,
+  onToggleHidden,
   onToggleKeys,
   openKeys,
 }: AssetTableProps) {
@@ -178,9 +180,12 @@ export function AssetTable({
 
             return (
               <Fragment key={asset.id}>
-                <tr className={needClass(need)}>
+                <tr className={[needClass(need), asset.hidden ? 'row-hidden' : null].filter(Boolean).join(' ') || undefined}>
                   <th className="cell-name" scope="row">
                     <a href={asset.assetUrl} rel="noreferrer" target="_blank">{asset.name}</a>
+                    {asset.hidden
+                      ? <span className="chip chip-hidden" title="Hidden from the public list.">Hidden</span>
+                      : null}
                   </th>
                   <td>{asset.publisher ?? <span className="muted">unknown</span>}</td>
                   <td>{formatCategory(asset.category) ?? <span className="muted">uncategorised</span>}</td>
@@ -218,6 +223,16 @@ export function AssetTable({
                       : (
                           <>
                             <button className="button-small" onClick={() => onEdit(asset)} type="button">Edit</button>
+                            <button
+                              className="button-small"
+                              onClick={() => onToggleHidden(asset)}
+                              title={asset.hidden
+                                ? 'Put this prize back on the public list.'
+                                : 'Take this prize off the public list; it stays here with its keys.'}
+                              type="button"
+                            >
+                              {asset.hidden ? 'Unhide' : 'Hide'}
+                            </button>
                             <button
                               aria-controls={`keys-${asset.id}`}
                               aria-expanded={openKeys === asset.id}

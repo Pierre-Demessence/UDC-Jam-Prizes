@@ -582,6 +582,19 @@ button:disabled {
   box-shadow: inset 3px 0 0 0 var(--ok);
 }
 
+/* A prize hidden from the public list: the name is muted and the chip says
+   "Hidden". The row itself stays fully usable, so the buttons are not dimmed. */
+.row-hidden th.cell-name a {
+  color: var(--text-muted);
+}
+
+.chip-hidden {
+  margin-left: 8px;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  vertical-align: middle;
+}
+
 .needed-cell {
   display: flex;
   gap: 6px;

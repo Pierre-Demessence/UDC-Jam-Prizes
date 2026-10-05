@@ -89,4 +89,20 @@ describe('the API client', () => {
 
     expect(init?.credentials).toBe('same-origin');
   });
+
+  it('hides and unhides a prize with a PUT carrying the flag', async () => {
+    let path: string | undefined;
+    let init: RequestInit | undefined;
+    vi.stubGlobal('fetch', async (input: string, options: RequestInit) => {
+      path = input;
+      init = options;
+      return responseOf(200, { asset: { id: 1, hidden: true } });
+    });
+
+    await api.setHidden(1, true);
+
+    expect(path).toBe('/api/admin/assets/1/hidden');
+    expect(init?.method).toBe('PUT');
+    expect(init?.body).toBe(JSON.stringify({ hidden: true }));
+  });
 });

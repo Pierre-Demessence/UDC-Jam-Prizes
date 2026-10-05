@@ -142,6 +142,7 @@ describe('the admin gate', () => {
       ['/api/admin/assets/1/keys', { method: 'POST' }],
       ['/api/admin/assets/1/keys/1', { method: 'DELETE' }],
       ['/api/admin/assets/1/needed', { method: 'PUT' }],
+      ['/api/admin/assets/1/hidden', { method: 'PUT' }],
       ['/api/metadata', { method: 'POST' }],
     ];
 
@@ -427,6 +428,94 @@ describe('the keys behind a prize', () => {
     expect(admin.asset.contact.discordHandle).toBe('author#1');
     expect(publicBody).not.toContain('author#1');
     expect(publicBody).not.toContain('replies slowly');
+  });
+});
+
+describe('hiding a prize from the public list', () => {
+  async function setHidden(cookie: string, id: unknown, hidden: unknown): Promise<Response> {
+    return app.request(`/api/admin/assets/${id}/hidden`, {
+      body: JSON.stringify({ hidden }),
+      headers: { 'content-type': 'application/json', cookie },
+      method: 'PUT',
+    });
+  }
+
+  it('takes the prize off the public list but keeps it in the admin one', async () => {
+    const cookie = await signIn();
+    const asset = await addAsset(cookie);
+
+    const response = await setHidden(cookie, asset.id, true);
+    expect(((await response.json()) as { asset: { hidden: boolean } }).asset.hidden).toBe(true);
+
+    const publicBody = await (await app.request('/api/assets')).json() as {
+      assets: unknown[];
+      totals: { count: number; priceCents: number };
+    };
+    expect(publicBody.assets).toHaveLength(0);
+    // Off the catalogue means out of the totals too: it is no longer on the page.
+    expect(publicBody.totals).toEqual({ count: 0, priceCents: 0 });
+
+    const adminBody = await (await app.request('/api/admin/assets', { headers: { cookie } }))
+      .json() as { assets: { hidden: boolean; id: number }[] };
+    expect(adminBody.assets.find(row => row.id === asset.id)?.hidden).toBe(true);
+  });
+
+  it('puts the prize back with its contact and keys untouched', async () => {
+    const cookie = await signIn();
+    const asset = await addAsset(cookie);
+    await app.request(`/api/admin/assets/${asset.id}/contact`, {
+      body: JSON.stringify({ discordHandle: 'someone' }),
+      headers: { 'content-type': 'application/json', cookie },
+      method: 'PUT',
+    });
+    await app.request(`/api/admin/assets/${asset.id}/keys`, json({ keys: 'KEY-1' }, cookie));
+
+    await setHidden(cookie, asset.id, true);
+    await setHidden(cookie, asset.id, false);
+
+    const publicBody = await (await app.request('/api/assets')).json() as { assets: { id: number }[]; totals: { count: number } };
+    expect(publicBody.assets.map(row => row.id)).toEqual([asset.id]);
+    expect(publicBody.totals.count).toBe(1);
+
+    const adminBody = await (await app.request('/api/admin/assets', { headers: { cookie } }))
+      .json() as { assets: { contact: unknown; id: number; keys: unknown[] }[] };
+    const row = adminBody.assets.find(candidate => candidate.id === asset.id);
+    expect(row?.contact).not.toBeNull();
+    expect(row?.keys).toHaveLength(1);
+  });
+
+  it('leaves the flag alone when the prize is edited', async () => {
+    const cookie = await signIn();
+    const asset = await addAsset(cookie);
+    await setHidden(cookie, asset.id, true);
+
+    // The edit form carries the whole asset back; a stray `hidden` key in it must
+    // not turn a hidden prize visible again.
+    const response = await app.request(`/api/admin/assets/${asset.id}`, {
+      body: JSON.stringify({ ...asset, name: 'Renamed', hidden: false }),
+      headers: { 'content-type': 'application/json', cookie },
+      method: 'PATCH',
+    });
+
+    expect((await response.json() as { asset: { name: string; hidden: boolean } }).asset)
+      .toMatchObject({ name: 'Renamed', hidden: true });
+  });
+
+  it('refuses a value that is not a boolean', async () => {
+    const cookie = await signIn();
+    const asset = await addAsset(cookie);
+
+    for (const hidden of ['yes', 1, null]) {
+      const response = await setHidden(cookie, asset.id, hidden);
+      expect(response.status, String(hidden)).toBe(400);
+    }
+  });
+
+  it('refuses to hide a prize that does not exist', async () => {
+    const cookie = await signIn();
+    const response = await setHidden(cookie, 9999, true);
+
+    expect(response.status).toBe(404);
   });
 });
 

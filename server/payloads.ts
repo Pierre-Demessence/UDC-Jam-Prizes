@@ -45,6 +45,8 @@ export interface AdminContact {
 export interface AdminAsset extends PublicAsset {
   contact: AdminContact | null;
   createdAt: string;
+  /** Hidden from the public catalogue, but still listed here. */
+  hidden: boolean;
   keys: AdminKey[];
   /** How many keys the winners asked for. Private: it is planning, not catalogue data. */
   needed: number;
@@ -84,6 +86,7 @@ export function toAdminAsset(asset: Asset, contact: Contact | null, keys: Key[],
     ...toPublicAsset(asset),
     contact: contact === null ? null : { contactNotes: contact.contactNotes, discordHandle: contact.discordHandle },
     createdAt: asset.createdAt.toISOString(),
+    hidden: asset.hidden,
     needed: asset.needed,
     notes: asset.notes,
     updatedAt: asset.updatedAt.toISOString(),

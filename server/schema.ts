@@ -16,6 +16,13 @@ export const assets = sqliteTable('assets', {
   assetUrl: text('asset_url').notNull(),
   category: text('category'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
+  /**
+   * Hidden from the public catalogue while staying in the admin list with its
+   * keys and contact: pulling a prize off the public page never loses anything,
+   * and it can be shown again. The default is in SQL so adding the column gives
+   * the rows already in the table a value.
+   */
+  hidden: integer('hidden', { mode: 'boolean' }).notNull().default(false),
   imageUrl: text('image_url'),
   needed: integer('needed').notNull().default(0),
   notes: text('notes'),

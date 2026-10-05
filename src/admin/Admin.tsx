@@ -127,6 +127,19 @@ export function Admin() {
     }
   }
 
+  async function toggleHidden(asset: AdminAsset): Promise<void> {
+    try {
+      mergeAsset((await api.setHidden(asset.id, !asset.hidden)).asset);
+      setNotice(asset.hidden
+        ? `"${asset.name}" is back on the public list.`
+        : `Hid "${asset.name}" from the public list. It stays here with its keys.`);
+    }
+    catch (cause) {
+      setNotice(cause instanceof Error ? cause.message : String(cause));
+      await reload();
+    }
+  }
+
   async function signOut(): Promise<void> {
     try {
       await api.signOut();
@@ -139,6 +152,8 @@ export function Admin() {
     setAuthenticated(false);
     setAssets([]);
   }
+
+  const hiddenCount = assets.filter(asset => asset.hidden).length;
 
   return (
     <div className="page page-wide">
@@ -172,6 +187,7 @@ export function Admin() {
                   {assets.length === 1 ? 'prize' : 'prizes'}
                   {' '}
                   in the list
+                  {hiddenCount === 0 ? null : ` · ${hiddenCount} hidden`}
                 </p>
                 <div className="field-row">
                   <button
@@ -235,6 +251,7 @@ export function Admin() {
                           await reload();
                         }
                       }}
+                      onToggleHidden={asset => void toggleHidden(asset)}
                       openKeys={openPanel}
                     />
                   )}

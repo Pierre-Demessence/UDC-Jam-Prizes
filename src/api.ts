@@ -117,6 +117,11 @@ export const api = {
     `/api/admin/assets/${id}/needed`,
     json({ needed }, 'PUT'),
   ),
+  /** Shows or hides a prize on the public page; the admin table's own button. */
+  setHidden: (id: number, hidden: boolean) => request<{ asset: AdminAsset }>(
+    `/api/admin/assets/${id}/hidden`,
+    json({ hidden }, 'PUT'),
+  ),
   updateAsset: (id: number, input: AssetInput) => request<{ asset: AdminAsset }>(
     `/api/admin/assets/${id}`,
     json(input, 'PATCH'),

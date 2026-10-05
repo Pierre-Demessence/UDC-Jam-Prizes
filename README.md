@@ -54,6 +54,8 @@ client and the API, which is what a deployment would run.
   The prize list is a table — every column sorts, and each row opens its own keys and contact. Type how
   many keys a prize needs and the row says whether they have arrived: plain when nothing was asked for,
   marked up while the request is unfilled, and marked up differently once it is filled.
+  Hiding a prize takes it off the public page — its keys and contact stay here — and the same button
+  shows it again.
   *Paste several links* adds a whole batch at once (up to 20, read a few at a time), reporting per
   link whether it was added, already there, or unreadable. Key values are encrypted on the way in and
   decrypted for the admin screen only; they never leave the server in a public response.

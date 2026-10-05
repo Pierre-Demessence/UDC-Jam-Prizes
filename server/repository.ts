@@ -18,13 +18,17 @@ type Db = DatabaseHandle['db'];
 
 /** The public catalogue: shaped fields only, plus the totals the header shows. */
 export function publicCatalogue(db: Db): PublicCatalogue {
-  const rows = db.select().from(assets).orderBy(asc(assets.name)).all();
+  // Hidden prizes are left out entirely, totals included: the public page is the
+  // catalogue, and a prize taken off it is not part of the sum any more.
+  const visible = eq(assets.hidden, false);
+  const rows = db.select().from(assets).where(visible).orderBy(asc(assets.name)).all();
   const totals = db
     .select({
       count: sql<number>`count(*)`,
       priceCents: sql<number>`coalesce(sum(${assets.priceCents}), 0)`,
     })
     .from(assets)
+    .where(visible)
     .get();
 
   return {
@@ -87,6 +91,20 @@ export function updateNeeded(db: Db, id: number, needed: number, secret: string)
     return null;
 
   db.update(assets).set({ needed }).where(eq(assets.id, id)).run();
+
+  return adminAsset(db, id, secret);
+}
+
+/**
+ * Shows or hides a prize on the public side, from the admin table's own button.
+ * The row itself is never touched: hiding keeps its keys, contact and notes.
+ */
+export function updateHidden(db: Db, id: number, hidden: boolean, secret: string): AdminAsset | null {
+  const existing = db.select().from(assets).where(eq(assets.id, id)).get();
+  if (!existing)
+    return null;
+
+  db.update(assets).set({ hidden }).where(eq(assets.id, id)).run();
 
   return adminAsset(db, id, secret);
 }

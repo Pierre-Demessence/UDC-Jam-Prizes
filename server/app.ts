@@ -32,6 +32,7 @@ import {
   publicCatalogue,
   saveContact,
   updateAsset,
+  updateHidden,
   updateNeeded,
 } from './repository.ts';
 import { assertAssetStoreUrl, fetchAssetPage } from './unity-fetch.ts';
@@ -40,6 +41,7 @@ import {
   assetInputFromMetadata,
   parseAssetInput,
   parseContactInput,
+  parseHiddenInput,
   parseId,
   parseKeyValues,
   parseNeededInput,
@@ -339,6 +341,25 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
       return c.json({ error: input.error }, 400);
 
     const asset = updateNeeded(db, id, input.value.needed, keyEncryptionSecret);
+
+    return asset === null ? c.json({ error: 'Unknown asset.' }, 404) : c.json({ asset });
+  });
+
+  /** The admin table's Hide/Unhide button: off the public page, still in the admin list. */
+  app.put('/api/admin/assets/:id/hidden', async (c) => {
+    const denied = requireAdmin(c);
+    if (denied)
+      return denied;
+
+    const id = parseId(c.req.param('id'));
+    if (id === null)
+      return c.json({ error: 'Unknown asset.' }, 404);
+
+    const input = parseHiddenInput(await readJson(c));
+    if (!input.ok)
+      return c.json({ error: input.error }, 400);
+
+    const asset = updateHidden(db, id, input.value.hidden, keyEncryptionSecret);
 
     return asset === null ? c.json({ error: 'Unknown asset.' }, 404) : c.json({ asset });
   });

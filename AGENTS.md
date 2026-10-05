@@ -75,6 +75,9 @@ the socket address. Run typecheck, lint, test and build before considering work 
 - Private data (Discord handles, key values, internal notes, how many keys a prize needs) never leaves
   the API: public responses are shaped server-side from an explicit field list, so hiding fields in the
   UI is not the safeguard. `assets.notes` is private too — never hand a whole row to a public payload.
+- `assets.hidden` keeps a prize off the public catalogue: `publicCatalogue` filters it out, totals
+  included, while the admin list keeps it marked "Hidden" with its keys and contact. Editing a prize
+  through the form never changes the flag; only the table's Hide/Unhide button does.
 - Key values are ciphertext at rest (`server/secrets.ts`, AES-256-GCM, key from
   `KEY_ENCRYPTION_SECRET`): never write a key with a plain insert, and never compare `key_value` for
   duplicates — encryption is randomised. `keys.key_fingerprint` is what recognises a repeated key, and
