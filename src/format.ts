@@ -42,3 +42,25 @@ export function totalsTooltip(totals: { count: number; priceCents: number }, cur
 export function assetCurrency(assets: PublicAsset[], fallback = 'USD'): string {
   return assets.find(asset => asset.priceCents !== null)?.currency ?? fallback;
 }
+
+const ACRONYMS = new Set(['2d', '3d', 'ai', 'ar', 'gui', 'ui', 'vfx', 'vr', 'xr']);
+
+/**
+ * The category is the Asset Store path, which is readable but technical:
+ * `3d/environments/landscapes` becomes `3D › Environments › Landscapes`.
+ */
+export function formatCategory(category: string | null): string | null {
+  const segments = (category ?? '')
+    .split('/')
+    .map(segment => segment.trim())
+    .filter(segment => segment !== '')
+    .map(segment => segment
+      .split('-')
+      .map((word) => {
+        const lower = word.toLowerCase();
+        return ACRONYMS.has(lower) ? lower.toUpperCase() : `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
+      })
+      .join(' '));
+
+  return segments.length === 0 ? null : segments.join(' › ');
+}

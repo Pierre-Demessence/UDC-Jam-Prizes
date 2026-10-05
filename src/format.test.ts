@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { assetCurrency, describeTotals, formatAssetCount, formatPrice, totalsTooltip } from '@/format';
+import { assetCurrency, describeTotals, formatAssetCount, formatCategory, formatPrice, totalsTooltip } from '@/format';
 
 import type { PublicAsset } from '../server/payloads.ts';
 
@@ -56,6 +56,27 @@ describe('the totals line', () => {
 
     expect(tooltip).toContain('$10.00');
     expect(tooltip).toContain('without a known price');
+  });
+});
+
+describe('formatCategory', () => {
+  it('turns the store path into something readable', () => {
+    expect(formatCategory('3d/environments/landscapes')).toBe('3D › Environments › Landscapes');
+  });
+
+  it('keeps the shorthands that are written in capitals', () => {
+    expect(formatCategory('tools/gui')).toBe('Tools › GUI');
+    expect(formatCategory('vfx/shaders')).toBe('VFX › Shaders');
+  });
+
+  it('turns dashes into spaces', () => {
+    expect(formatCategory('tools/particles-effects')).toBe('Tools › Particles Effects');
+  });
+
+  it('has nothing to show for no category', () => {
+    expect(formatCategory(null)).toBeNull();
+    expect(formatCategory('')).toBeNull();
+    expect(formatCategory('///')).toBeNull();
   });
 });
 

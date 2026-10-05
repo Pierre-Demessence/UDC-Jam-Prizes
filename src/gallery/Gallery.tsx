@@ -5,11 +5,13 @@ import type { SortKey } from '@/catalogue';
 
 import { api } from '@/api';
 import { categoriesOf, DEFAULT_FILTERS, filterAssets, SORT_LABELS } from '@/catalogue';
-import { assetCurrency, describeTotals, formatPrice, totalsTooltip } from '@/format';
+import { assetCurrency, describeTotals, formatCategory, formatPrice, totalsTooltip } from '@/format';
 
 import brand from '../../brand.json';
 
 function AssetCard({ asset }: { asset: Catalogue['assets'][number] }) {
+  const category = formatCategory(asset.category);
+
   return (
     <article className="card">
       <a className="card-media" href={asset.assetUrl} rel="noreferrer" target="_blank">
@@ -23,7 +25,7 @@ function AssetCard({ asset }: { asset: Catalogue['assets'][number] }) {
         </h3>
         <p className="card-meta">
           <span>{asset.publisher ?? 'Unknown publisher'}</span>
-          {asset.category === null ? null : <span className="chip">{asset.category}</span>}
+          {category === null ? null : <span className="chip">{category}</span>}
         </p>
         <p className="card-price">{formatPrice(asset.priceCents, asset.currency)}</p>
       </div>
@@ -69,9 +71,6 @@ export function Gallery() {
         <div>
           <p className="eyebrow">Prize catalogue</p>
           <h1>{brand.name}</h1>
-          <p className="tagline">
-            Every Unity asset donated to the jam. Winners pick, we hand out the keys.
-          </p>
         </div>
       </header>
 
@@ -115,7 +114,9 @@ export function Gallery() {
                     value={filters.category}
                   >
                     <option value="">All categories</option>
-                    {categories.map(category => <option key={category} value={category}>{category}</option>)}
+                    {categories.map(category => (
+                      <option key={category} value={category}>{formatCategory(category)}</option>
+                    ))}
                   </select>
                 </label>
 

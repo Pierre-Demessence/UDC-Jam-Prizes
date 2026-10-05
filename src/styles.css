@@ -82,12 +82,6 @@ a:hover {
   color: var(--text-muted);
 }
 
-.tagline {
-  margin: 0;
-  max-width: 62ch;
-  color: var(--text-muted);
-}
-
 .header-actions {
   display: flex;
   gap: 10px;
