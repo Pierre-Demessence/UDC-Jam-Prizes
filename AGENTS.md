@@ -15,6 +15,8 @@ small Hono API and a SQLite database.
   overrides the file (default `data/prizes.sqlite`).
 - Lint: `npm run lint` / `npm run lint:fix`
 - Test: `npm test` / `npm run test:watch` / `npm run test:coverage`
+- Container: `docker build -t udc-jam-prizes .`, then run it with `NODE_ENV=production`, the three
+  secrets and a **writable volume at `/data`** owned by uid 1001 — the app cannot start without one.
 
 Requires Node ≥ 23.6: the server runs on Node's native TypeScript support, so there is no `tsx`.
 
@@ -40,6 +42,9 @@ known addresses. Run typecheck, lint, test and build before considering work don
 - `index.html` — Vite HTML entry; `%APP_NAME%` is replaced from `brand.json` at build time.
 - `docs/` — `backlog.md` (everything not done), `decisions.md` (non-obvious
   decisions and why), `plans/` (work in progress).
+- `k8s/prod/` — the deployed manifests (Deployment, Service, Ingress, PVC, ExternalSecret) that
+  ArgoCD syncs. `.github/workflows/deploy.yml` builds the image and pins its tag in `deployment.yaml`;
+  the ArgoCD `Application` that points at this path lives in the GitOps repository, not here.
 
 ## Conventions
 
@@ -76,3 +81,9 @@ known addresses. Run typecheck, lint, test and build before considering work don
   `vitest.config.ts`.
 - The app name comes from `brand.json`; never hard-code it in `index.html`.
 - The API listens on 3001 and the Vite dev proxy targets it; change both together.
+- The Deployment is one replica with the `Recreate` strategy on purpose: SQLite is a single writer on
+  a `ReadWriteOnce` volume. Raising the replica count, or switching to `RollingUpdate`, either blocks
+  on the volume or corrupts the database.
+- The image must carry `drizzle/` beside `server/`, and `package.json` with `"type": "module"`:
+  migrations are resolved relative to `server/db.ts`, and the module type is what makes Node read the
+  server's `.ts` files as ESM. Losing either one breaks the pod at startup.

@@ -1,0 +1,15 @@
+# Keeps real secrets and local state out of the image layers. Without this,
+# `COPY . .` would bake `.env` and `data/prizes.sqlite` — encrypted key material
+# from a live catalogue — into the build.
+.env
+.env.*
+.git
+.github
+.vscode
+node_modules
+dist
+data
+coverage
+docs
+.eslintcache
+*.log

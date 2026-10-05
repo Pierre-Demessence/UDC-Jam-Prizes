@@ -81,6 +81,11 @@ Three things about the deployment are deliberate:
   one that cannot be regenerated: losing it makes every stored key unreadable, so a restored database
   without it is worthless.
 
+Checking a deployment: `kubectl -n jam-prizes-prod get pods` and
+`kubectl -n jam-prizes-prod logs deploy/jam-prizes`. A bad image goes back with
+`kubectl -n jam-prizes-prod rollout undo deploy/jam-prizes`, though a schema change does not roll back
+with it (see [docs/backlog.md](docs/backlog.md)).
+
 ## Docs
 
 - [docs/decisions.md](docs/decisions.md) — non-obvious decisions and why.
