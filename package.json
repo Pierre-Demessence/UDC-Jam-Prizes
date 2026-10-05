@@ -1,0 +1,53 @@
+{
+  "name": "udc-jam-prizes",
+  "type": "module",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=23.6.0"
+  },
+  "scripts": {
+    "dev": "concurrently -n web,api -c cyan,magenta \"vite\" \"npm run dev:api\"",
+    "dev:api": "node --watch --env-file-if-exists=.env server/index.ts",
+    "start": "node --env-file-if-exists=.env server/index.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --cache .",
+    "lint:fix": "eslint --cache --fix .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "better-sqlite3": "^13.0.3",
+    "drizzle-orm": "^0.45.3",
+    "hono": "^4.13.10",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^8.0.0",
+    "@eslint-react/eslint-plugin": "^3.0.0",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.1",
+    "@vitest/coverage-v8": "^4.1.2",
+    "concurrently": "^10.0.5",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^10.2.0",
+    "eslint-import-resolver-typescript": "^4.4.5",
+    "eslint-plugin-import-x": "^4.17.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "jiti": "^2.6.1",
+    "jsdom": "^29.0.1",
+    "typescript": "~5.9.3",
+    "vite": "^8.0.3",
+    "vitest": "^4.1.2"
+  }
+}

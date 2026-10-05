@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX `contacts_asset_id_unique` ON `contacts` (`asset_id`);

@@ -1,0 +1,16 @@
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "files.exclude": {
+    "coverage/": true,
+    "node_modules/": true,
+    "dist/": true
+  },
+  "editor.defaultFormatter": "dbaeumer.vscode-eslint",
+  "editor.formatOnSave": true,
+  "editor.tabSize": 2,
+  "eslint.useFlatConfig": true,
+  "files.eol": "\n",
+  "typescript.tsdk": "node_modules/typescript/lib"
+}
