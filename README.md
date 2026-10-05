@@ -64,7 +64,22 @@ The admin side can also be pinned to known addresses: set `ADMIN_IP_ALLOWLIST` t
 list of addresses or CIDR blocks, and everything under `/api/session`, `/api/admin/*` and
 `/api/metadata` refuses any other address. Left empty, the password is the only door.
 
-The plan and its remaining items: [docs/plans/mvp.md](docs/plans/mvp.md).
+## Deploying
+
+The app runs on the Corniland Kubernetes cluster through ArgoCD. On a green CI run,
+`.github/workflows/deploy.yml` builds the image, pushes it to GHCR and pins its immutable tag in
+`k8s/prod/deployment.yaml`; the ArgoCD `Application` that syncs that path lives in the cluster's GitOps
+repository. The image is one process serving the API and the built client.
+
+Three things about the deployment are deliberate:
+
+- **One replica, `Recreate` strategy.** SQLite is a single writer on a `ReadWriteOnce` volume, so a
+  second pod would be a fault rather than redundancy.
+- **The database is on a PersistentVolumeClaim** at `/data/prizes.sqlite`, and the pod's `fsGroup`
+  makes that volume writable by the non-root user the app runs as.
+- **The three secrets come from 1Password** through an `ExternalSecret`. `KEY_ENCRYPTION_SECRET` is the
+  one that cannot be regenerated: losing it makes every stored key unreadable, so a restored database
+  without it is worthless.
 
 ## Docs
 

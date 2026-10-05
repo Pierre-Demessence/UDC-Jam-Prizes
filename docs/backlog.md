@@ -13,17 +13,17 @@ that completes it.
   twelve hours (`server/auth.ts`).
 - `connectDatabase` always creates the data directory, opens the file read-write and migrates it, so
   a read-only or second instance would fail at startup (`server/db.ts`).
-- `src/styles.css` keeps a `.mono` rule nothing uses (`src/styles.css`).
 - The public page is client-rendered; add a prerender or static export if it ever needs to be
   crawlable or link-preview friendly.
 - No automated accessibility check: `eslint-plugin-jsx-a11y` caps at ESLint 9 (`eslint.config.ts`).
+- `shutdown()` closes the server and then calls `process.exit(0)` at once, so in-flight requests are
+  dropped and the Deployment's 30s termination grace is never used (`server/index.ts`).
+- No way back from a schema change: migrations run forward on every connect, so rolling the image back
+  to an older build leaves the newer schema in place (`server/db.ts`).
 
 ## Ideas
 
-- Phase 2 from the brainstorm: full key management across jams, per-jam workflows with claim links,
-  audit log, backup/restore, CSV import from the old sheet.
-- Decide the deployment target (`npm start` fits a VPS, Fly or Render) and a backup routine for `data/`.
-- Totals add up cents across currencies and label the sum with the first priced asset's currency;
-  either group the sum by currency or state that a jam is single-currency (`server/repository.ts`).
+- A WAL-safe backup routine for `data/prizes.sqlite`: the cluster's Velero covers the volume, but a
+  consistent copy of a write-ahead-log database needs a checkpoint (`VACUUM INTO` in a CronJob).
 - Behind a reverse proxy every visitor shares one rate-limit key, so an attacker can lock the admin
   out for the window; consider trusting a proxy header from a known address (`server/app.ts`).
