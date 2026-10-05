@@ -24,6 +24,8 @@ export interface Config {
   keyEncryptionSecret: string;
   port: number;
   sessionSecret: string;
+  /** Proxies whose `X-Forwarded-For` is believed. Empty trusts nobody. */
+  trustedProxies: string[];
 }
 
 export class ConfigError extends Error {
@@ -37,6 +39,23 @@ const MIN_SECRET_LENGTH = 16;
 /** Longer than the session secret: this one protects data at rest, not a cookie. */
 const MIN_ENCRYPTION_SECRET_LENGTH = 32;
 const DEFAULT_PORT = 3001;
+
+/** A comma-separated address list from the environment, validated entry by entry. */
+function addressList(raw: string | undefined, name: string): string[] {
+  const patterns = (raw ?? '')
+    .split(',')
+    .map(entry => entry.trim())
+    .filter(entry => entry !== '');
+
+  const malformed = patterns.find(pattern => !isValidPattern(pattern));
+  if (malformed !== undefined) {
+    throw new ConfigError(
+      `${name} has an entry that is not an address, a block or a CIDR range: "${malformed}".`,
+    );
+  }
+
+  return patterns;
+}
 
 export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const adminPassword = env.ADMIN_PASSWORD?.trim() ?? '';
@@ -69,17 +88,8 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
   if (!Number.isInteger(port) || port < 1 || port > 65_535)
     throw new ConfigError('PORT must be a port number.');
 
-  const patterns = (env.ADMIN_IP_ALLOWLIST ?? '')
-    .split(',')
-    .map(entry => entry.trim())
-    .filter(entry => entry !== '');
-
-  const malformed = patterns.find(pattern => !isValidPattern(pattern));
-  if (malformed !== undefined) {
-    throw new ConfigError(
-      `ADMIN_IP_ALLOWLIST has an entry that is not an address, a block or a CIDR range: "${malformed}".`,
-    );
-  }
+  const patterns = addressList(env.ADMIN_IP_ALLOWLIST, 'ADMIN_IP_ALLOWLIST');
+  const trustedProxies = addressList(env.TRUSTED_PROXY_ALLOWLIST, 'TRUSTED_PROXY_ALLOWLIST');
 
   return {
     adminIp: { allowLoopback: env.NODE_ENV !== 'production', patterns },
@@ -90,5 +100,6 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): Config {
     keyEncryptionSecret,
     port,
     sessionSecret,
+    trustedProxies,
   };
 }

@@ -7,16 +7,9 @@ that completes it.
 
 ## Tech debt
 
-- The login rate limiter is in memory and per process: it forgets everything when the server restarts
-  (`server/auth.ts`).
 - `connectDatabase` always creates the data directory, opens the file read-write and migrates it, so
   a read-only or second instance would fail at startup (`server/db.ts`).
 - No way back from a schema change: migrations run forward on every connect, so rolling the image back
   to an older build leaves the newer schema in place (`server/db.ts`).
 
 ## Ideas
-
-- A WAL-safe backup routine for `data/prizes.sqlite`: the cluster's Velero covers the volume, but a
-  consistent copy of a write-ahead-log database needs a checkpoint (`VACUUM INTO` in a CronJob).
-- Behind a reverse proxy every visitor shares one rate-limit key, so an attacker can lock the admin
-  out for the window; consider trusting a proxy header from a known address (`server/app.ts`).

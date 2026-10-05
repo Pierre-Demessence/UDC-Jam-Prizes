@@ -23,7 +23,8 @@ Requires Node ≥ 23.6: the server runs on Node's native TypeScript support, so 
 First run: copy `.env.example` to `.env` and set `ADMIN_PASSWORD`, `KEY_ENCRYPTION_SECRET` and
 `SESSION_SECRET`. The dev and start scripts load `.env` themselves; a missing value stops the server
 with a readable message. `ADMIN_IP_ALLOWLIST` is optional and pins the admin side (login included) to
-known addresses. Run typecheck, lint, test and build before considering work done.
+known addresses; `TRUSTED_PROXY_ALLOWLIST` names the proxies whose `X-Forwarded-For` may stand in for
+the socket address. Run typecheck, lint, test and build before considering work done.
 
 ## Layout
 
@@ -60,6 +61,10 @@ known addresses. Run typecheck, lint, test and build before considering work don
 - Every `/api/admin/*` route and `/api/metadata` sits behind the admin gate; `GET /api/assets` is the
   only unauthenticated data route. When `ADMIN_IP_ALLOWLIST` is set, the same three path groups refuse
   other addresses first — the gate is `gateAddress` in `server/app.ts`, next to the password check.
+  `TRUSTED_PROXY_ALLOWLIST` never widens those controls: it only lets a listed proxy name the caller,
+  reading `X-Forwarded-For` from the right past hops that are themselves listed. List the ingress that
+  sets the header — anything inside a listed network may then name the caller. The login limiter's
+  window is in SQLite (`rate_limit_attempts`), so a restart cannot clear a lockout.
 - `/api/metadata` fetches `https://assetstore.unity.com` only (the allow-list in `unity-fetch.ts` is
   the SSRF guard — do not widen it without a reason).
 - `import-x/no-unresolved` checks every import, including the `@/` alias.

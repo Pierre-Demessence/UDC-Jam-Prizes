@@ -64,46 +64,59 @@ export interface RateLimiter {
   reset: (key: string) => void;
 }
 
+/**
+ * Where a limiter keeps its window. It is a keyed list of timestamps rather than
+ * a table of its own, because a window never holds more than `limit` attempts:
+ * the SQLite implementation replaces a key's rows wholesale.
+ */
+export interface AttemptStore {
+  /** This key's attempts, oldest first. */
+  load: (bucket: string, clientKey: string) => number[];
+  /** Drops the attempts that have aged out of one limiter's window. */
+  prune: (bucket: string, before: number) => void;
+  save: (bucket: string, clientKey: string, attempts: number[]) => void;
+}
+
 export interface RateLimiterOptions {
+  /** Names this limiter's own window in the store. */
+  bucket: string;
   limit: number;
+  store: AttemptStore;
   windowMs?: number;
   now?: () => number;
 }
 
 /**
- * Counts attempts per key in a sliding window, in memory: enough for a
- * single-process app with one admin, and it keeps the password endpoint from
- * being guessable at speed. A blocked attempt is not counted, so a client
- * cannot lock itself out forever.
+ * Counts attempts per key in a sliding window. A blocked attempt is not counted,
+ * so a client cannot lock itself out forever. The window lives in the store, and
+ * the server passes one backed by SQLite: a limit that a restart clears would be
+ * no limit at all against anyone able to restart the process.
  */
-export function createRateLimiter({ limit, now = Date.now, windowMs = RATE_WINDOW_MS }: RateLimiterOptions): RateLimiter {
-  const attempts = new Map<string, number[]>();
-
+export function createRateLimiter({ bucket, limit, now = Date.now, store, windowMs = RATE_WINDOW_MS }: RateLimiterOptions): RateLimiter {
   return {
     check(key) {
       const current = now();
-      const recent = (attempts.get(key) ?? []).filter(at => current - at < windowMs);
+      store.prune(bucket, current - windowMs);
 
-      if (recent.length >= limit) {
-        attempts.set(key, recent);
+      const recent = store.load(bucket, key).filter(at => current - at < windowMs);
+      if (recent.length >= limit)
         return { allowed: false, retryAfterMs: windowMs - (current - recent[0]) };
-      }
 
       recent.push(current);
-      attempts.set(key, recent);
+      store.save(bucket, key, recent);
       return { allowed: true, retryAfterMs: 0 };
     },
     reset(key) {
-      attempts.delete(key);
+      store.save(bucket, key, []);
     },
   };
 }
 
 /** Tests read the same defaults as the server. */
 export const rateLimits = {
-  import: { limit: 20, windowMs: RATE_WINDOW_MS },
-  login: { limit: 10, windowMs: RATE_WINDOW_MS },
-  metadata: { limit: 30, windowMs: RATE_WINDOW_MS },
+  import: { bucket: 'import', limit: 20, windowMs: RATE_WINDOW_MS },
+  login: { bucket: 'login', limit: 10, windowMs: RATE_WINDOW_MS },
+  metadata: { bucket: 'metadata', limit: 30, windowMs: RATE_WINDOW_MS },
 };
 
 export function isProduction(env: NodeJS.ProcessEnv = process.env): boolean {

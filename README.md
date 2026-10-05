@@ -63,7 +63,9 @@ client and the API, which is what a deployment would run.
 
 The admin side can also be pinned to known addresses: set `ADMIN_IP_ALLOWLIST` to a comma-separated
 list of addresses or CIDR blocks, and everything under `/api/session`, `/api/admin/*` and
-`/api/metadata` refuses any other address. Left empty, the password is the only door.
+`/api/metadata` refuses any other address. Left empty, the password is the only door. Behind a reverse
+proxy, set `TRUSTED_PROXY_ALLOWLIST` to the proxy's own addresses so the app reads the caller from
+`X-Forwarded-For` instead of treating every visitor as the proxy; left empty, nothing is trusted.
 
 ## Deploying
 

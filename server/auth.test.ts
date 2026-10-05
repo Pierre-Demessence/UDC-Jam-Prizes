@@ -1,6 +1,8 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 
+import type { AttemptStore, RateLimiter } from './auth.ts';
+
 import { createRateLimiter, createSessionToken, deriveSessionKey, passwordMatches, verifySessionToken } from './auth.ts';
 
 const SECRET = 'a-test-session-secret-long-enough';
@@ -65,43 +67,76 @@ describe('passwords', () => {
   });
 });
 
+/** A stand-in for the SQLite store: these tests are about the rule, not the storage. */
+function memoryStore(): AttemptStore {
+  const windows = new Map<string, number[]>();
+  const entry = (bucket: string, clientKey: string): string => `${bucket}/${clientKey}`;
+
+  return {
+    load: (bucket, clientKey) => [...(windows.get(entry(bucket, clientKey)) ?? [])],
+    prune: (bucket, before) => {
+      for (const [name, attempts] of windows) {
+        if (name.startsWith(`${bucket}/`))
+          windows.set(name, attempts.filter(at => at >= before));
+      }
+    },
+    save: (bucket, clientKey, attempts) => {
+      windows.set(entry(bucket, clientKey), [...attempts]);
+    },
+  };
+}
+
+function limiter(limit: number, windowMs = 1_000, now: () => number = () => NOW): RateLimiter {
+  return createRateLimiter({ bucket: 'test', limit, now, store: memoryStore(), windowMs });
+}
+
 describe('the rate limiter', () => {
   it('allows attempts up to the limit, then blocks', () => {
-    const limiter = createRateLimiter({ limit: 3, windowMs: 1_000, now: () => NOW });
+    const subject = limiter(3);
 
-    expect([1, 2, 3].map(() => limiter.check('a').allowed)).toEqual([true, true, true]);
-    expect(limiter.check('a')).toEqual({ allowed: false, retryAfterMs: 1_000 });
+    expect([1, 2, 3].map(() => subject.check('a').allowed)).toEqual([true, true, true]);
+    expect(subject.check('a')).toEqual({ allowed: false, retryAfterMs: 1_000 });
   });
 
   it('counts each address separately', () => {
-    const limiter = createRateLimiter({ limit: 1, windowMs: 1_000, now: () => NOW });
-    limiter.check('a');
+    const subject = limiter(1);
+    subject.check('a');
 
-    expect(limiter.check('b').allowed).toBe(true);
+    expect(subject.check('b').allowed).toBe(true);
   });
 
   it('lets an address through again after its window has passed', () => {
     let now = NOW;
-    const limiter = createRateLimiter({ limit: 1, windowMs: 1_000, now: () => now });
-    limiter.check('a');
+    const subject = limiter(1, 1_000, () => now);
+    subject.check('a');
     now += 1_001;
 
-    expect(limiter.check('a').allowed).toBe(true);
+    expect(subject.check('a').allowed).toBe(true);
   });
 
   it('does not extend the block when it is already blocking', () => {
-    const limiter = createRateLimiter({ limit: 1, windowMs: 1_000, now: () => NOW });
-    limiter.check('a');
-    limiter.check('a');
+    const subject = limiter(1);
+    subject.check('a');
+    subject.check('a');
 
-    expect(limiter.check('a').retryAfterMs).toBe(1_000);
+    expect(subject.check('a').retryAfterMs).toBe(1_000);
   });
 
   it('forgets an address after a successful sign-in', () => {
-    const limiter = createRateLimiter({ limit: 1, windowMs: 1_000, now: () => NOW });
-    limiter.check('a');
-    limiter.reset('a');
+    const subject = limiter(1);
+    subject.check('a');
+    subject.reset('a');
 
-    expect(limiter.check('a').allowed).toBe(true);
+    expect(subject.check('a').allowed).toBe(true);
+  });
+
+  it('keeps two limiters apart inside one store', () => {
+    const store = memoryStore();
+    const login = createRateLimiter({ bucket: 'login', limit: 1, store, windowMs: 1_000, now: () => NOW });
+    const metadata = createRateLimiter({ bucket: 'metadata', limit: 1, store, windowMs: 1_000, now: () => NOW });
+
+    login.check('a');
+
+    expect(metadata.check('a').allowed).toBe(true);
   });
 });

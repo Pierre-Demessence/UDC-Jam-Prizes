@@ -3,8 +3,8 @@
  *
  * Defence in depth on top of the password: the admin area can be restricted to
  * addresses you know. It matches the *socket* address, so it cannot be spoofed
- * with a header — but that also means a reverse proxy hides every real visitor
- * behind its own address (see docs/backlog.md).
+ * with a header — and behind a reverse proxy only an address listed in
+ * `TRUSTED_PROXY_ALLOWLIST` may speak for the caller (server/app.ts).
  */
 
 const LOOPBACK = new Set(['127.0.0.1', '::1', 'localhost']);

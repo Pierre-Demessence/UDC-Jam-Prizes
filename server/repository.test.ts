@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { DatabaseHandle } from './db.ts';
 
 import { connectDatabase } from './db.ts';
-import { adminAsset, encryptLegacyKeys } from './repository.ts';
+import { adminAsset, createAttemptStore, encryptLegacyKeys } from './repository.ts';
 import { assets, keys } from './schema.ts';
 import { encryptSecret } from './secrets.ts';
 import { testConfig } from './testing.ts';
@@ -130,5 +130,45 @@ describe('keys stored before encryption existed', () => {
 
     // And a second start leaves both alone.
     expect(encryptLegacyKeys(handle.db, SECRET)).toBe(0);
+  });
+});
+
+describe('the limiter store', () => {
+  const NOW = 1_700_000_000_000;
+
+  it('keeps each limiter and each key apart, oldest first', () => {
+    const store = createAttemptStore(handle.db);
+    store.save('login', 'a', [NOW + 20, NOW]);
+    store.save('login', 'b', [NOW + 30]);
+    store.save('metadata', 'a', [NOW + 40]);
+
+    expect(store.load('login', 'a')).toEqual([NOW, NOW + 20]);
+    expect(store.load('login', 'b')).toEqual([NOW + 30]);
+    expect(store.load('metadata', 'a')).toEqual([NOW + 40]);
+  });
+
+  it('replaces a key\'s window instead of appending to it', () => {
+    const store = createAttemptStore(handle.db);
+    store.save('login', 'a', [NOW, NOW + 1]);
+    store.save('login', 'a', []);
+
+    expect(store.load('login', 'a')).toEqual([]);
+  });
+
+  it('prunes only the limiter it was asked about', () => {
+    const store = createAttemptStore(handle.db);
+    store.save('login', 'a', [NOW]);
+    store.save('metadata', 'a', [NOW]);
+    store.prune('login', NOW + 1);
+
+    expect(store.load('login', 'a')).toEqual([]);
+    expect(store.load('metadata', 'a')).toEqual([NOW]);
+  });
+
+  it('still holds the attempts when a new store opens the same database', () => {
+    // What the app does on every start: a restart must not clear the window.
+    createAttemptStore(handle.db).save('login', 'a', [NOW]);
+
+    expect(createAttemptStore(handle.db).load('login', 'a')).toEqual([NOW]);
   });
 });

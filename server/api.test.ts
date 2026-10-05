@@ -113,6 +113,22 @@ describe('the session endpoints', () => {
     expect(blocked.status).toBe(429);
     expect(await blocked.json()).toHaveProperty('error');
   });
+
+  it('keeps that lockout when the server restarts', async () => {
+    for (let attempt = 0; attempt < 10; attempt++)
+      await app.request('/api/session', json({ password: 'nope' }));
+
+    // A new app on the same database is what a restart looks like: the window
+    // lives in SQLite, so the lockout survives it.
+    const afterRestart = createApp({
+      config: testConfig({ adminPassword: PASSWORD }),
+      fetchImpl: (async () => new Response(fixture, { status: 200 })) as typeof fetch,
+      handle,
+    });
+    const blocked = await afterRestart.request('/api/session', json({ password: PASSWORD }));
+
+    expect(blocked.status).toBe(429);
+  });
 });
 
 describe('the admin gate', () => {
@@ -565,6 +581,73 @@ describe('the admin allow-list', () => {
     const response = await app.request('/api/session', { method: 'GET' }, fromAddress(BLOCKED));
 
     expect(response.status).toBe(200);
+  });
+});
+
+describe('a trusted proxy', () => {
+  const PROXY = '10.0.0.1';
+  const CLIENT = '203.0.113.7';
+  const OTHER = '198.51.100.9';
+
+  function throughProxy(headers: Record<string, string>, from = PROXY): Record<string, unknown> {
+    return { incoming: { headers, socket: { remoteAddress: from } } };
+  }
+
+  function proxyApp(patterns: string[] = [CLIENT], trusted: string[] = [PROXY]): ReturnType<typeof createApp> {
+    return createApp({
+      config: testConfig({ adminIp: { allowLoopback: false, patterns }, trustedProxies: trusted }),
+      fetchImpl: (async () => new Response(fixture, { status: 200 })) as typeof fetch,
+      handle,
+    });
+  }
+
+  it('lets the allow-list see the client the proxy names', async () => {
+    const response = await proxyApp()
+      .request('/api/session', json({ password: PASSWORD }), throughProxy({ 'x-forwarded-for': CLIENT }));
+
+    expect(response.status).toBe(200);
+  });
+
+  it('reads the last hop, so a client cannot name itself', async () => {
+    // The client put 1.2.3.4 in the header; the proxy appended what it saw. Only
+    // the appended address counts, so a spoofed entry cannot talk past the list.
+    const response = await proxyApp()
+      .request('/api/session', json({ password: PASSWORD }), throughProxy({ 'x-forwarded-for': `1.2.3.4, ${CLIENT}` }));
+
+    expect(response.status).toBe(200);
+  });
+
+  it('skips a hop that is itself a listed proxy, as a load balancer in front is', async () => {
+    // Two proxies in the chain: the ingress saw the load balancer, which saw the
+    // client. Neither of them can stand in for the caller.
+    const response = await proxyApp([CLIENT], ['10.0.0.0/24'])
+      .request('/api/session', json({ password: PASSWORD }), throughProxy({ 'x-forwarded-for': `${CLIENT}, 10.0.0.2` }));
+
+    expect(response.status).toBe(200);
+  });
+
+  it('gives every client behind the proxy its own rate-limit window', async () => {
+    const proxy = proxyApp([]);
+    for (let attempt = 0; attempt < 10; attempt++)
+      await proxy.request('/api/session', json({ password: 'nope' }), throughProxy({ 'x-forwarded-for': CLIENT }));
+
+    const other = await proxy.request('/api/session', json({ password: PASSWORD }), throughProxy({ 'x-forwarded-for': OTHER }));
+
+    expect(other.status).toBe(200);
+  });
+
+  it('falls back to the socket address when the header is missing', async () => {
+    const response = await proxyApp()
+      .request('/api/session', json({ password: PASSWORD }), throughProxy({}));
+
+    expect(response.status).toBe(403);
+  });
+
+  it('ignores the header when the peer is not a listed proxy', async () => {
+    const response = await proxyApp()
+      .request('/api/session', json({ password: PASSWORD }), throughProxy({ 'x-forwarded-for': CLIENT }, OTHER));
+
+    expect(response.status).toBe(403);
   });
 });
 

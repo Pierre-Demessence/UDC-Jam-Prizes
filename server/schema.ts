@@ -75,3 +75,20 @@ export const keys = sqliteTable('keys', {
 export type Asset = typeof assets.$inferSelect;
 export type Contact = typeof contacts.$inferSelect;
 export type Key = typeof keys.$inferSelect;
+
+/**
+ * One limiter attempt. The login limit is pointless if a restart clears it, and
+ * the login endpoint is the only unauthenticated writer, so its window lives
+ * here rather than in memory — `bucket` names the limiter, so the admin-only
+ * limits can move in later. Rows age out of their window as they are checked.
+ * There is no `$defaultFn` on `attempted_at`: the limiter passes the time it
+ * judged the attempt by, so a test can control the clock.
+ */
+export const rateLimitAttempts = sqliteTable('rate_limit_attempts', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  attemptedAt: integer('attempted_at', { mode: 'timestamp_ms' }).notNull(),
+  bucket: text('bucket').notNull(),
+  clientKey: text('client_key').notNull(),
+}, table => [
+  index('rate_limit_attempts_window_index').on(table.bucket, table.clientKey, table.attemptedAt),
+]);

@@ -44,7 +44,9 @@ TypeScript support needs (`package.json`).
   `build`, and this repo's `server/`, `drizzle/`, `package.json`. Non-root uid/gid 1001.
   `CMD ["node", "server/index.ts"]` rather than `npm start`, so there is no `.env` lookup; the cluster
   supplies the environment.
-- `PORT=3001`, `NODE_ENV=production`, `DATABASE_PATH=/data/prizes.sqlite` (the PVC mount).
+- `PORT=3001`, `NODE_ENV=production`, `DATABASE_PATH=/data/prizes.sqlite` (the PVC mount), and
+  `TRUSTED_PROXY_ALLOWLIST=10.42.0.0/24`, the node's pod range: the app believes `X-Forwarded-For`
+  only from a listed address, so it reads visitors rather than the ingress pod.
 - The server binds every interface already: `@hono/node-server` calls `listen(port, undefined)`, so no
   code change is needed. Proved with a real request against the container, not by reading.
 - **`.dockerignore` is written before the first build.** Without it `COPY . .` bakes `.env` and
@@ -72,8 +74,9 @@ Deployment specifics:
   file is writable, `seccompProfile: RuntimeDefault`. Container: `allowPrivilegeEscalation: false`,
   `readOnlyRootFilesystem: true`, `capabilities.drop: [ALL]`, with a `/tmp` `emptyDir`.
 - Resources: requests 50m / 128Mi, limits 500m / 512Mi.
-- Env: `NODE_ENV=production`, `PORT=3001`, `DATABASE_PATH=/data/prizes.sqlite`, and `envFrom` the
-  Secret.
+- Env: `NODE_ENV=production`, `PORT=3001`, `DATABASE_PATH=/data/prizes.sqlite`,
+  `TRUSTED_PROXY_ALLOWLIST=10.42.0.0/24` (the node's pod range, so the ingress may name the caller),
+  and `envFrom` the Secret.
 - Probes: startup 2s × 30 and readiness every 10s on `/api/health` (`server/app.ts:139`) — the slack
   covers migrations running at boot on a cold volume — and liveness as a **TCP** check on the port, so
   a database hiccup takes the pod out of the Service instead of restarting it.
@@ -130,12 +133,14 @@ encryption secret above.
 
 ### Admin reachability
 
-`ADMIN_IP_ALLOWLIST` is **not** set. Behind Traefik the app sees the proxy's socket address, so the
-in-app allow-list would see one address for everyone — it would either block all admins or none
-(`docs/decisions.md`, and already in the backlog). The password and the login rate limiter are the
-door. Pinning the admin at the edge (a Traefik `ipAllowList` middleware on `/admin`, `/api/admin/*`,
-`/api/session`, `/api/metadata`) is a documented option, not part of this plan: it bars the admin from
-every network but the listed one.
+`ADMIN_IP_ALLOWLIST` stays **unset**: pinning the admin at the edge (a Traefik `ipAllowList` middleware
+on `/admin`, `/api/admin/*`, `/api/session`, `/api/metadata`) would bar the admin from every network but
+the listed one, and the password plus the login rate limiter are the door instead (`docs/decisions.md`).
+
+What the Deployment does pass is `TRUSTED_PROXY_ALLOWLIST`, set to the node's pod range. Without it the
+app reads every request as coming from the ingress pod, so one attacker could spend the login limit for
+everyone and each client shared a single rate-limit key; with it, the limiter counts real clients, and
+the in-app allow-list becomes usable the same way should it ever be wanted.
 
 ### Docs
 
@@ -143,8 +148,7 @@ every network but the listed one.
   one-replica/`Recreate` constraint.
 - `AGENTS.md` — `k8s/` and the workflows in Layout, the image build in Commands.
 - `docs/decisions.md` — why one replica and `Recreate`, and the SQLite-on-a-PVC shape.
-- `docs/backlog.md` — the backup CronJob; trusting a proxy header so the rate limiter sees real
-  addresses.
+- `docs/backlog.md` — the WAL-safe backup CronJob.
 
 ## Prerequisites (blocking, need your input)
 

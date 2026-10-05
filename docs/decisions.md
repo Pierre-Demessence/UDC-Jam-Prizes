@@ -112,10 +112,10 @@ every `<meta>` tag and the JSON-LD blocks verbatim — so the tests stay honest 
 carries an expiry plus its HMAC, `HttpOnly`, `SameSite=Strict`, and `Secure` in production. That HMAC
 key is derived from `SESSION_SECRET` **and the password**, so changing the password ends every session
 already issued — the moment revoking them matters — instead of leaving a cookie valid for its full
-twelve hours. Login attempts are limited per client address, in memory. Rejected: an auth framework or
-a session table — there is exactly one admin and no user records to keep, so the whole gate is thirty
-lines, and the derived key is what a session table would otherwise be needed for. One accepted
-consequence, in `docs/backlog.md`: the limiter resets when the process restarts.
+twelve hours. Login attempts are limited per client address, with the window kept in SQLite (see "The
+rate limiter's window lives in SQLite"). Rejected: an auth framework or a session table — there is
+exactly one admin and no user records to keep, so the whole gate is thirty lines, and the derived key is
+what a session table would otherwise be needed for.
 
 ## A batch of links is read on the server, a few at a time
 
@@ -136,15 +136,33 @@ drops whatever is left, and a second signal means "now". The Deployment's 30 s g
 limit: this makes the pod use it instead of cutting a response in half. Rejected: exiting at once,
 which dropped a response mid-write on every deploy.
 
+## The rate limiter's window lives in SQLite
+
+A lockout that a restart clears is no lockout against anyone able to restart the process, and the login
+endpoint is the only unauthenticated writer, so its window is kept in the database rather than in a
+`Map`. The store is a keyed list of timestamps — a window never holds more than `limit` attempts, so a
+save replaces a key's rows instead of tracking them — and rows age out of it as they are checked. The
+admin-only limiters share the same store, which costs a write per import or metadata lookup and keeps
+one rule for all three. Rejected: keeping the window in memory and persisting only the lockout, which
+is two rules to reason about for the same guarantee.
+
 ## The admin can be pinned to known addresses
 
 `ADMIN_IP_ALLOWLIST` (addresses, CIDR blocks, IPv6 literals) closes `/api/session`, `/api/admin/*` and
 `/api/metadata` to every other address, the login included; an empty list leaves the admin reachable
-from anywhere. It matches the **socket** address, which a header cannot spoof, and local addresses stay
-allowed outside production so a dev machine cannot lock itself out.
+from anywhere. Local addresses stay allowed outside production so a dev machine cannot lock itself out.
 
-The consequence to know: behind a reverse proxy every visitor arrives from the proxy's address, so the
-list, like the rate limiter, sees one address for everyone (`docs/backlog.md`).
+The address matched is the socket's, which no header can spoof. Behind a reverse proxy that would be
+the proxy for every visitor, so `TRUSTED_PROXY_ALLOWLIST` names the proxies whose word counts. When the
+socket belongs to one of them, the caller is read from `X-Forwarded-For` **from the right**: a hop that
+is itself a listed proxy belongs to the chain, and the first entry that is not is the client. The
+entries further left are whatever the client sent, so a spoofed one can neither talk past the list nor
+forge a rate-limit identity. That holds only while the proxy next to the app replaces the header or
+appends to it — a pass-through proxy hands the caller's identity to the caller. List the address of the
+ingress that sets the header, not a whole pod network: anything inside such a network may then name the
+caller. Traefik replaces an `X-Forwarded-For` it was not told to trust and appends the peer it saw,
+which is why `forwardedHeaders.trustedIPs` is how it believes a load balancer in front of it. Empty
+trusts nobody, which is the default.
 
 ## Key values are encrypted at rest
 
@@ -245,6 +263,7 @@ it belongs where access and rotation are controlled. The consequence to know: th
 what makes a restored volume readable, and no snapshot of the volume can replace it.
 
 `ADMIN_IP_ALLOWLIST` stays unset in the cluster. Behind Traefik the app sees the proxy's socket address,
-so the list would see one address for every visitor (see "The admin can be pinned to known addresses").
-Pinning the admin at the edge is possible and deliberately not done: it would bar the admin from every
-network but the listed one.
+so on its own the list would see one address for every visitor; `TRUSTED_PROXY_ALLOWLIST`, set to
+Traefik's own addresses, is what makes it usable again, and it stays unset here too (see "The admin can
+be pinned to known addresses"). Pinning the admin at the edge is possible and deliberately not done: it
+would bar the admin from every network but the listed one.

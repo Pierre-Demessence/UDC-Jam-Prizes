@@ -2,15 +2,16 @@
  * Database access. SQLite is synchronous, so these are plain functions: every
  * one returns finished data rather than a promise.
  */
-import { asc, eq, sql } from 'drizzle-orm';
+import { and, asc, eq, lt, sql } from 'drizzle-orm';
 
+import type { AttemptStore } from './auth.ts';
 import type { DatabaseHandle } from './db.ts';
 import type { AdminAsset, PublicCatalogue } from './payloads.ts';
 import type { Asset } from './schema.ts';
 import type { AssetInput, ContactInput } from './validate.ts';
 
 import { toAdminAsset, toPublicAsset } from './payloads.ts';
-import { assets, contacts, keys } from './schema.ts';
+import { assets, contacts, keys, rateLimitAttempts } from './schema.ts';
 import { decryptSecret, encryptSecret, fingerprintSecret, isEncrypted } from './secrets.ts';
 
 type Db = DatabaseHandle['db'];
@@ -172,4 +173,44 @@ export function deleteKey(db: Db, assetId: number, keyId: number, secret: string
     db.delete(keys).where(eq(keys.id, keyId)).run();
 
   return adminAsset(db, assetId, secret);
+}
+
+/**
+ * The limiter's windows, in SQLite: a restart must not clear a lockout. A window
+ * holds at most `limit` timestamps, so `save` replaces a key's rows instead of
+ * tracking them one by one.
+ */
+export function createAttemptStore(db: Db): AttemptStore {
+  const mine = (bucket: string, clientKey: string) => and(
+    eq(rateLimitAttempts.bucket, bucket),
+    eq(rateLimitAttempts.clientKey, clientKey),
+  );
+
+  return {
+    load(bucket, clientKey) {
+      return db
+        .select({ at: rateLimitAttempts.attemptedAt })
+        .from(rateLimitAttempts)
+        .where(mine(bucket, clientKey))
+        .orderBy(asc(rateLimitAttempts.attemptedAt))
+        .all()
+        .map(row => row.at.getTime());
+    },
+    prune(bucket, before) {
+      db.delete(rateLimitAttempts)
+        .where(and(eq(rateLimitAttempts.bucket, bucket), lt(rateLimitAttempts.attemptedAt, new Date(before))))
+        .run();
+    },
+    save(bucket, clientKey, attempts) {
+      db.transaction((tx) => {
+        tx.delete(rateLimitAttempts).where(mine(bucket, clientKey)).run();
+
+        if (attempts.length > 0) {
+          tx.insert(rateLimitAttempts)
+            .values(attempts.map(at => ({ attemptedAt: new Date(at), bucket, clientKey })))
+            .run();
+        }
+      });
+    },
+  };
 }

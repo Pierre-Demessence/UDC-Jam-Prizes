@@ -50,6 +50,13 @@ spec:
               value: '3001'
             - name: DATABASE_PATH
               value: /data/prizes.sqlite
+            # The node's pod range, which is where the app's peer address comes
+            # from: it believes X-Forwarded-For only from these addresses, so the
+            # rate limiter and the allow-list see visitors rather than the ingress
+            # pod. A second node would get another /24 (the cluster's 10.42.0.0/16)
+            # and need adding here.
+            - name: TRUSTED_PROXY_ALLOWLIST
+              value: 10.42.0.0/24
           envFrom:
             - secretRef:
                 name: jam-prizes

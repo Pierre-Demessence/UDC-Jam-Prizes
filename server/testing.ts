@@ -13,6 +13,7 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     keyEncryptionSecret: 'test-key-encryption-secret-32-chars-plus',
     port: 3001,
     sessionSecret: 'test-session-secret-long-enough',
+    trustedProxies: [],
     ...overrides,
   };
 }

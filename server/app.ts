@@ -25,6 +25,7 @@ import {
   adminAsset,
   adminCatalogue,
   createAsset,
+  createAttemptStore,
   deleteAsset,
   deleteKey,
   findAssetByAssetId,
@@ -80,9 +81,11 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
   // Derived once: it is what the session cookie is signed with, so a changed
   // password stops every cookie issued under the old one from verifying.
   const sessionKey = deriveSessionKey(config.sessionSecret, config.adminPassword);
-  const importLimiter = createRateLimiter(rateLimits.import);
-  const loginLimiter = createRateLimiter(rateLimits.login);
-  const metadataLimiter = createRateLimiter(rateLimits.metadata);
+  // The limiter windows live in SQLite, so a restart cannot clear a lockout.
+  const attemptStore = createAttemptStore(db);
+  const importLimiter = createRateLimiter({ ...rateLimits.import, store: attemptStore });
+  const loginLimiter = createRateLimiter({ ...rateLimits.login, store: attemptStore });
+  const metadataLimiter = createRateLimiter({ ...rateLimits.metadata, store: attemptStore });
 
   app.use('*', secureHeaders({
     contentSecurityPolicy: {
@@ -94,14 +97,50 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
     },
   }));
 
-  /** The real socket address, so a header cannot dodge a rate limit or the allow-list. */
-  function clientAddress(env: unknown): string | undefined {
-    const incoming = (env as { incoming?: { socket?: { remoteAddress?: string } } } | undefined)?.incoming;
-    return incoming?.socket?.remoteAddress;
+  /** True for a proxy the configuration says may speak for the caller. */
+  function isTrustedProxy(address: string | null): boolean {
+    return address !== null && addressMatches(address, config.trustedProxies);
+  }
+
+  /**
+   * The address the request came from. The socket address is the only one a header
+   * cannot fake, so on its own it stands — unless it belongs to a proxy we were
+   * told to believe, which says who the caller is in `X-Forwarded-For`. The hops
+   * are read from the right, which is where a proxy appends: an entry naming
+   * another listed proxy is a hop of that chain, and the first entry that is not
+   * is the client. Whatever sits before it is what the client sent, so a spoofed
+   * entry cannot name it. A trusted proxy also gives the allow-list real visitors
+   * back, instead of its own address.
+   */
+  function clientAddress(env: unknown): string | null {
+    const incoming = (env as {
+      incoming?: {
+        headers?: Record<string, string | string[] | undefined>;
+        socket?: { remoteAddress?: string };
+      };
+    } | undefined)?.incoming;
+
+    const socket = normalizeAddress(incoming?.socket?.remoteAddress);
+    if (!isTrustedProxy(socket))
+      return socket;
+
+    const forwarded = incoming?.headers?.['x-forwarded-for'];
+    const hops = (Array.isArray(forwarded) ? forwarded.join(',') : forwarded ?? '')
+      .split(',')
+      .map(hop => normalizeAddress(hop))
+      .filter(hop => hop !== null);
+
+    for (const hop of hops.toReversed()) {
+      if (!isTrustedProxy(hop))
+        return hop;
+    }
+
+    // Every hop was a proxy of the chain: the socket address is all that is left.
+    return socket;
   }
 
   function clientKey(env: unknown): string {
-    return normalizeAddress(clientAddress(env)) ?? 'local';
+    return clientAddress(env) ?? 'local';
   }
 
   /** Empty allow-list means the admin area is reachable from anywhere. */
@@ -110,7 +149,7 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
     if (patterns.length === 0)
       return true;
 
-    const address = normalizeAddress(clientAddress(env));
+    const address = clientAddress(env);
     if (allowLoopback && isLoopback(address))
       return true;
 
