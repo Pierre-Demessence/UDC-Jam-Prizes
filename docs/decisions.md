@@ -27,10 +27,15 @@ public gallery and the admin form need real component state.
 ## Metadata from the JSON-LD, the list price from the page's own product data
 
 The page carries a schema.org `Product` in an `application/ld+json` block: `name`, `image`,
-`description`, `brand.name`, and an `offers` object with `price` and `priceCurrency`. Unity serves that
+`description`, `brand.name`, and an `offers` object with a `price`. Unity serves that
 same markup to a plain HTTP client, so `POST /api/metadata` is one fetch and one parse — no headless
 browser, no internal API. Category is the exception: it is not in the markup, so it comes from the page
 path (`/packages/tools/gui/…` → `tools/gui`) and stays editable in the form.
+
+The catalogue is USD, which is what a server-side request gets from Unity. The offer's
+`priceCurrency` is read only to check that: an offer that declares another currency is treated as no
+price at all, so the admin types the right one by hand instead of a foreign amount entering the
+totals as dollars. An offer that declares no currency is taken at face value.
 
 The price needs one more source: `offers.price` is the **discounted** price, so a prize imported during
 a sale would be valued at the price of the week. The page also embeds its own copy of the product, keyed
@@ -55,8 +60,9 @@ Node's built-in `node:sqlite` was the fallback if no binary was available.
 
 ## Money in cents, identifiers as text
 
-`assets.priceCents` is an integer number of cents, with `currency` beside it, and it stays null when
-the page did not provide a price. Floats were rejected: money rounding ends up as cents that never add
+`assets.priceCents` is an integer number of cents and it stays null when the page did not provide a
+price; prices are USD, which is what a server-side request gets from Unity, so no currency is stored
+beside them. Floats were rejected: money rounding ends up as cents that never add
 up. Unity's `assetId` is text — it labels an asset and is never arithmetic — and it carries the unique
 index that turns re-importing a sheet row into an update instead of a duplicate.
 
@@ -206,3 +212,30 @@ load. Rejected: a router dependency for two screens.
 
 `eslint-plugin-jsx-a11y` declares support up to ESLint 9 and this project is on ESLint 10, so it is
 not installed. Accessibility is checked in review and in the browser instead.
+
+## One stateful pod, synced from GitOps
+
+The app deploys to the Corniland cluster as a single replica of an image that serves the API and the
+built client, with the SQLite file on a `ReadWriteOnce` PersistentVolumeClaim. `Recreate` rather than
+the default `RollingUpdate`, because SQLite is a single writer: a second pod would either wait for a
+volume only one may hold or mount the same file twice. That is also why the usual production hardening
+is absent here — no second replica, no PodDisruptionBudget, no autoscaler: none of it can help a
+workload whose database is a file beside it.
+
+The image is built per commit, pushed to GHCR, and its immutable tag is committed into
+`k8s/prod/deployment.yaml` by CI, which is the path ArgoCD watches. Rejected: `latest` with a manual
+`kubectl apply` — the cluster runs no image updater, and a tag nobody records makes a rollback a guess.
+Also rejected: moving to PostgreSQL to allow several replicas, which trades the reason SQLite was
+chosen at all (see "Vite + React client, Hono API, SQLite") for redundancy a one-admin catalogue does
+not need.
+
+Secrets come from 1Password through External Secrets rather than from a Kubernetes Secret committed to
+the GitOps repository: that repository is the deployment's source of truth and is readable by the
+cluster, and `KEY_ENCRYPTION_SECRET` is the one value whose loss makes every stored key unreadable, so
+it belongs where access and rotation are controlled. The consequence to know: the 1Password entry is
+what makes a restored volume readable, and no snapshot of the volume can replace it.
+
+`ADMIN_IP_ALLOWLIST` stays unset in the cluster. Behind Traefik the app sees the proxy's socket address,
+so the list would see one address for every visitor (see "The admin can be pinned to known addresses").
+Pinning the admin at the edge is possible and deliberately not done: it would bar the admin from every
+network but the listed one.

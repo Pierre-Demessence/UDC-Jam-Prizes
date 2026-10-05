@@ -5,7 +5,7 @@ import type { SortKey } from '@/catalogue';
 
 import { api } from '@/api';
 import { categoriesOf, DEFAULT_FILTERS, filterAssets, SORT_LABELS } from '@/catalogue';
-import { assetCurrency, describeTotals, formatCategory, formatPrice, totalsTooltip } from '@/format';
+import { describeTotals, formatCategory, formatPrice, totalsTooltip } from '@/format';
 
 import brand from '../../brand.json';
 
@@ -27,7 +27,7 @@ function AssetCard({ asset }: { asset: Catalogue['assets'][number] }) {
           <span>{asset.publisher ?? 'Unknown publisher'}</span>
           {category === null ? null : <span className="chip">{category}</span>}
         </p>
-        <p className="card-price">{formatPrice(asset.priceCents, asset.currency)}</p>
+        <p className="card-price">{formatPrice(asset.priceCents)}</p>
       </div>
     </article>
   );
@@ -63,7 +63,6 @@ export function Gallery() {
   const assets = useMemo(() => catalogue?.assets ?? [], [catalogue]);
   const visible = useMemo(() => filterAssets(assets, filters), [assets, filters]);
   const categories = useMemo(() => categoriesOf(assets), [assets]);
-  const currency = assetCurrency(assets);
 
   return (
     <div className="page">
@@ -91,8 +90,8 @@ export function Gallery() {
         : (
             <>
               <section className="totals" aria-label="Totals">
-                <p className="total" title={totalsTooltip(catalogue.totals, currency)}>
-                  <strong>{describeTotals(catalogue.totals, currency)}</strong>
+                <p className="total" title={totalsTooltip(catalogue.totals)}>
+                  <strong>{describeTotals(catalogue.totals)}</strong>
                 </p>
               </section>
 

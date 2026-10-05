@@ -47,7 +47,6 @@ describe('parseAssetPage on a real Asset Store page', () => {
 
   it('reads the price from the product offer', () => {
     expect(metadata.priceCents).toBe(3250);
-    expect(metadata.currency).toBe('USD');
   });
 
   it('makes the image absolute, since the page serves it protocol-relative', () => {
@@ -71,10 +70,6 @@ describe('parseAssetPage when the asset is on sale', () => {
     // against 4.48 in the visitor's currency: a ratio of 6.674, which lifts the
     // offer's 4.87 to the 32.50 USD list price.
     expect(metadata.priceCents).toBe(3250);
-  });
-
-  it('keeps the offer currency, since the entry is in the visitor\'s own', () => {
-    expect(metadata.currency).toBe('USD');
   });
 
   it('fills every other field from the product markup', () => {
@@ -142,20 +137,30 @@ describe('parseAssetPage on the fields worth getting right', () => {
     const metadata = parseAssetPage(pageWith(product({ offers: undefined })), PAGE_URL);
 
     expect(metadata.priceCents).toBeNull();
-    expect(metadata.currency).toBe('USD');
   });
 
   it('accepts an offer list, as schema.org allows', () => {
-    const offers = [{ price: '9.99', priceCurrency: 'eur' }];
+    const offers = [{ price: '9.99', priceCurrency: 'USD' }];
     const metadata = parseAssetPage(pageWith(product({ offers })), PAGE_URL);
 
     expect(metadata.priceCents).toBe(999);
-    expect(metadata.currency).toBe('EUR');
   });
 
   it('accepts a numeric price', () => {
     const offers = { price: 12.5, priceCurrency: 'USD' };
     expect(parseAssetPage(pageWith(product({ offers })), PAGE_URL).priceCents).toBe(1250);
+  });
+
+  it('reads an offer that declares no currency at all', () => {
+    const offers = { price: '32.50' };
+
+    expect(parseAssetPage(pageWith(product({ offers })), PAGE_URL).priceCents).toBe(3250);
+  });
+
+  it('refuses a price given in another currency, rather than calling it dollars', () => {
+    const offers = { price: '32.50', priceCurrency: 'EUR' };
+
+    expect(parseAssetPage(pageWith(product({ offers })), PAGE_URL).priceCents).toBeNull();
   });
 
   it('treats a free asset as a price of zero rather than as unknown', () => {

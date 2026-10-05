@@ -185,7 +185,7 @@ export function AssetTable({
                   <td>{asset.publisher ?? <span className="muted">unknown</span>}</td>
                   <td>{formatCategory(asset.category) ?? <span className="muted">uncategorised</span>}</td>
                   <td className="cell-number" title="Read from the Asset Store page; edit it if it is wrong.">
-                    {formatPrice(asset.priceCents, asset.currency)}
+                    {formatPrice(asset.priceCents)}
                   </td>
                   <td className="cell-number" title={keySummary(asset)}>
                     {asset.keys.length}

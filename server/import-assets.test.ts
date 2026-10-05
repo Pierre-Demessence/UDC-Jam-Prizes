@@ -54,13 +54,12 @@ describe('importing several links', () => {
   it('fills each prize from the page it read', async () => {
     await importAssets(handle.db, pageFetcher, [url('111')], SECRET);
 
-    const row = handle.sqlite.prepare('select name, asset_id, price_cents, currency, category from assets').get();
+    const row = handle.sqlite.prepare('select name, asset_id, price_cents, category from assets').get();
 
     expect(row).toEqual({
       name: 'Prize 111',
       asset_id: '111',
       category: 'tools',
-      currency: 'USD',
       price_cents: 3250,
     });
   });

@@ -2,9 +2,11 @@
  * Reading an Asset Store page.
  *
  * The page carries a schema.org `Product` in a `application/ld+json` block —
- * name, image, description, brand and an `Offer` with `price` and
- * `priceCurrency` — so the whole autofill is a parse, no browser and no
- * undocumented API. Unity also serves that same markup to a plain HTTP client.
+ * name, image, description, brand and an `Offer` with a `price` — so the whole
+ * autofill is a parse, no browser and no undocumented API. Unity also serves
+ * that same markup to a plain HTTP client. Prices are USD: a server-side request
+ * gets USD from Unity, so no currency is stored with them — an offer that declares
+ * another currency is refused rather than valued as dollars.
  */
 
 /** The catalogue fields an Asset Store page can fill in. */
@@ -13,7 +15,6 @@ export interface AssetMetadata {
   assetId: string;
   assetUrl: string;
   category: string | null;
-  currency: string;
   imageUrl: string | null;
   priceCents: number | null;
   publisher: string | null;
@@ -29,7 +30,7 @@ export class MetadataError extends Error {
 
 const LD_JSON_BLOCK = /<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<\/script>/gi;
 const CENTS = 100;
-const DEFAULT_CURRENCY = 'USD';
+const USD = 'USD';
 const TRAILING_ID = /(\d+)\/?$/;
 
 const ENTITIES: Record<string, string> = {
@@ -78,16 +79,23 @@ function firstImage(value: unknown): string | null {
   return null;
 }
 
-function offerPrice(offers: unknown): { currency: string | null; priceCents: number | null } {
+/**
+ * The offer's price in cents, or nothing when the page offers no usable amount.
+ * The catalogue is USD, so an offer that declares another currency is read as
+ * no price rather than stored as if it were dollars.
+ */
+function offerPriceCents(offers: unknown): number | null {
   const first = Array.isArray(offers) ? offers[0] : offers;
   if (typeof first !== 'object' || first === null)
-    return { currency: null, priceCents: null };
+    return null;
 
   const offer = first as { price?: unknown; priceCurrency?: unknown };
-  return {
-    currency: asNonEmptyString(offer.priceCurrency)?.toUpperCase() ?? null,
-    priceCents: toCents(offer.price),
-  };
+  const currency = asNonEmptyString(offer.priceCurrency)?.toUpperCase();
+  // Some pages carry no currency at all; the offer is then taken at face value.
+  if (currency !== undefined && currency !== USD)
+    return null;
+
+  return toCents(offer.price);
 }
 
 /** The JSON object that starts at `from`, found by counting braces outside strings. */
@@ -220,7 +228,7 @@ export function parseAssetPage(html: string, pageUrl: string): AssetMetadata {
     throw new MetadataError('That page has no asset id, so the asset cannot be identified.');
 
   const image = firstImage(product.image);
-  const offer = offerPrice(product.offers);
+  const offerCents = offerPriceCents(product.offers);
   // The price the page offers is the sale price during a sale; the entry's ratio
   // lifts it to the list price, which is what a donated prize is worth.
   const ratio = listToSaleRatio(html, assetId);
@@ -233,11 +241,10 @@ export function parseAssetPage(html: string, pageUrl: string): AssetMetadata {
     assetId,
     assetUrl: url.href,
     category: categoryFromPath(url),
-    currency: offer.currency ?? DEFAULT_CURRENCY,
     imageUrl: image ? new URL(image, url).href : null,
     publisher: asNonEmptyString((product.brand as { name?: unknown } | undefined)?.name),
-    priceCents: offer.priceCents === null || ratio === null
-      ? offer.priceCents
-      : Math.round(offer.priceCents * ratio),
+    priceCents: offerCents === null || ratio === null
+      ? offerCents
+      : Math.round(offerCents * ratio),
   };
 }

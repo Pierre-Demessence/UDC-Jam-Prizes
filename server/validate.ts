@@ -32,7 +32,6 @@ export interface AssetInput {
   assetId: string;
   assetUrl: string;
   category: string | null;
-  currency: string;
   imageUrl: string | null;
   notes: string | null;
   priceCents: number | null;
@@ -99,7 +98,6 @@ export function parseAssetInput(body: unknown): Validation<AssetInput> {
   const publisher = text(raw.publisher, 'The publisher', MAX_NAME, false);
   const category = text(raw.category, 'The category', MAX_NAME, false);
   const imageUrl = text(raw.imageUrl, 'The image URL', MAX_URL, false);
-  const currency = text(raw.currency, 'The currency', 3, false);
   const notes = text(raw.notes, 'The notes', MAX_NOTES, false);
   const priceCents = money(raw.priceCents);
 
@@ -115,8 +113,6 @@ export function parseAssetInput(body: unknown): Validation<AssetInput> {
     return category;
   if (!imageUrl.ok)
     return imageUrl;
-  if (!currency.ok)
-    return currency;
   if (!notes.ok)
     return notes;
   if (!priceCents.ok)
@@ -137,7 +133,6 @@ export function parseAssetInput(body: unknown): Validation<AssetInput> {
       assetId: assetId.value as string,
       assetUrl: checkedUrl.value as string,
       category: category.value,
-      currency: currency.value?.toUpperCase() ?? 'USD',
       imageUrl: checkedImage.value,
       notes: notes.value,
       priceCents: priceCents.value,
@@ -153,7 +148,6 @@ export function assetInputFromMetadata(metadata: AssetMetadata): AssetInput {
     assetId: metadata.assetId,
     assetUrl: metadata.assetUrl,
     category: metadata.category,
-    currency: metadata.currency,
     imageUrl: metadata.imageUrl,
     notes: null,
     priceCents: metadata.priceCents,

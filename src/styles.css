@@ -360,10 +360,6 @@ button:disabled {
   font-size: 0.85rem;
 }
 
-.mono {
-  font-family: ui-monospace, SFMono-Regular, "Cascadia Mono", Menlo, monospace;
-}
-
 /* Panels (admin) */
 
 .panel {

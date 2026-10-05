@@ -16,7 +16,6 @@ export const assets = sqliteTable('assets', {
   assetUrl: text('asset_url').notNull(),
   category: text('category'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
-  currency: text('currency').notNull().default('USD'),
   imageUrl: text('image_url'),
   needed: integer('needed').notNull().default(0),
   notes: text('notes'),

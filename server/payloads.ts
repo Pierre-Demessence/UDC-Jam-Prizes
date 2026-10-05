@@ -16,7 +16,6 @@ export interface PublicAsset {
   assetId: string;
   assetUrl: string;
   category: string | null;
-  currency: string;
   imageUrl: string | null;
   priceCents: number | null;
   publisher: string | null;
@@ -74,7 +73,6 @@ export function toPublicAsset(asset: Asset): PublicAsset {
     assetId: asset.assetId,
     assetUrl: asset.assetUrl,
     category: asset.category,
-    currency: asset.currency,
     imageUrl: asset.imageUrl,
     priceCents: asset.priceCents,
     publisher: asset.publisher,

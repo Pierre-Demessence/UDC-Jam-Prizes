@@ -43,7 +43,6 @@ export function AssetForm({ editing, metadata, onCancel, onSaved }: AssetFormPro
       assetId: '',
       assetUrl: url.trim(),
       category: null,
-      currency: 'USD',
       imageUrl: null,
       notes: null,
       priceCents: null,
@@ -89,7 +88,6 @@ export function AssetForm({ editing, metadata, onCancel, onSaved }: AssetFormPro
     const input: AssetInput = {
       ...source,
       assetUrl: url.trim() === '' ? source.assetUrl : url.trim(),
-      currency: source.currency === '' ? 'USD' : source.currency,
       priceCents,
     };
 
@@ -166,21 +164,12 @@ export function AssetForm({ editing, metadata, onCancel, onSaved }: AssetFormPro
               </label>
 
               <label className="field">
-                <span>{`Price in ${source.currency || 'the currency below'}`}</span>
+                <span>Price (USD)</span>
                 <input
                   inputMode="decimal"
                   onChange={event => setPrice(event.target.value)}
                   placeholder="leave empty if unknown"
                   value={price}
-                />
-              </label>
-
-              <label className="field">
-                <span>Currency</span>
-                <input
-                  maxLength={3}
-                  onChange={event => update('currency', event.target.value.toUpperCase())}
-                  value={source.currency}
                 />
               </label>
 

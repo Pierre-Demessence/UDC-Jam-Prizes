@@ -11,7 +11,6 @@ function asset(overrides: Partial<PublicAsset>): PublicAsset {
     assetId: '1',
     assetUrl: 'https://assetstore.unity.com/packages/tools/a-tool-1',
     category: 'tools',
-    currency: 'USD',
     imageUrl: null,
     priceCents: 1000,
     publisher: 'Someone',

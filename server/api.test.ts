@@ -13,7 +13,7 @@ const PAGE_URL = 'https://assetstore.unity.com/packages/tools/gui/text-animator-
 const fixture = readFileSync(new URL('./fixtures/asset-page.html', import.meta.url), 'utf8');
 
 // `id` and `name` first, then alphabetical: the house key order.
-const PUBLIC_FIELDS = ['id', 'name', 'assetId', 'assetUrl', 'category', 'currency', 'imageUrl', 'priceCents', 'publisher'];
+const PUBLIC_FIELDS = ['id', 'name', 'assetId', 'assetUrl', 'category', 'imageUrl', 'priceCents', 'publisher'];
 
 let handle: DatabaseHandle;
 let app: ReturnType<typeof createApp>;

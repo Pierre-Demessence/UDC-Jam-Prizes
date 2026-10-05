@@ -54,7 +54,6 @@ describe('the assets table', () => {
     const asset = addAsset();
 
     expect(asset.id).toBe(1);
-    expect(asset.currency).toBe('USD');
     expect(asset.createdAt).toBeInstanceOf(Date);
     expect(asset.updatedAt).toBeInstanceOf(Date);
   });

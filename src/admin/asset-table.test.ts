@@ -12,7 +12,6 @@ function asset(overrides: Partial<AdminAsset> & { name: string }): AdminAsset {
     category: null,
     contact: null,
     createdAt: '2024-01-01T00:00:00.000Z',
-    currency: 'USD',
     imageUrl: null,
     keys: [],
     needed: 0,
