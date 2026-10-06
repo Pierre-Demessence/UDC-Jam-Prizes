@@ -30,8 +30,8 @@ the socket address. Run typecheck, lint, test and build before considering work 
 
 - `src/` — the React client; `main.tsx` mounts `<App>` into `#app`. `App.tsx` switches between the
   public gallery (`src/gallery/`) and the admin (`src/admin/`); API calls live in `src/api.ts`, and
-  the testable logic in `src/catalogue.ts`, `src/format.ts`, `src/sort.ts` and
-  `src/admin/asset-table.ts` (the admin table's columns and sorting).
+  the testable logic in `src/catalogue.ts`, `src/format.ts`, `src/sort.ts`, and
+  `src/admin/asset-table.ts` and `src/admin/author-table.ts` (each admin table's columns and sorting).
 - `server/` — the API; `index.ts` (server + static `dist/`), `app.ts` (routes), `db.ts` (SQLite),
   `schema.ts` (the Drizzle tables), `repository.ts` (queries), `payloads.ts` (public and admin
   response shapes), `validate.ts` (input rules), `auth.ts` (session cookie + rate limits),

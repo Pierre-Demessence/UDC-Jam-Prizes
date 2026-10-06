@@ -1,5 +1,8 @@
 import { Fragment, useEffect, useState } from 'react';
 
+import type { Sort, SortKey } from '@/admin/author-table';
+
+import { COLUMNS, DEFAULT_SORT, nextSort, sortAuthors } from '@/admin/author-table';
 import { AuthorForm } from '@/admin/AuthorForm';
 import { Modal } from '@/admin/Modal';
 import { api } from '@/api';
@@ -15,10 +18,10 @@ interface AuthorsPanelProps {
 }
 
 /**
- * The author table's columns — publisher, handle, id, prizes, actions — so the
- * attach row can span them.
+ * The author table's columns — publisher, publisher id, handle, Discord id, prizes,
+ * actions — so the attach row can span them.
  */
-const ATTACH_COLUMNS = 5;
+const ATTACH_COLUMNS = 6;
 
 function prizeCount(count: number): string {
   return `${count} ${count === 1 ? 'prize' : 'prizes'}`;
@@ -36,12 +39,13 @@ function PublisherCell({ author }: { author: AdminAuthor }) {
 }
 
 /**
- * The authors behind the prizes. Editing them once here is the point: the store
- * publisher is what a prize matches on, so this panel is also where a whole back
- * catalogue is attached to its author in one click.
+ * The authors behind the prizes, every column sortable. Editing them once here is
+ * the point: the store publisher is what a prize matches on, so this panel is also
+ * where a whole back catalogue is attached to its author in one click.
  */
 export function AuthorsPanel({ onAssetsChanged, onClose, onNotice }: AuthorsPanelProps) {
   const [authors, setAuthors] = useState<AdminAuthor[]>([]);
+  const [sort, setSort] = useState<Sort>(DEFAULT_SORT);
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<AdminAuthor | null>(null);
   const [confirmingId, setConfirmingId] = useState<number | null>(null);
@@ -58,6 +62,37 @@ export function AuthorsPanel({ onAssetsChanged, onClose, onNotice }: AuthorsPane
     catch (cause) {
       setMessage(cause instanceof Error ? cause.message : String(cause));
     }
+  }
+
+  const rows = sortAuthors(authors, sort);
+
+  function header(key: SortKey, label: string, title: string, alignEnd?: boolean) {
+    const active = sort.key === key;
+    const hint = active
+      ? `${title} Sorted ${sort.direction === 'ascending' ? 'from A to Z' : 'from Z to A'}; click to turn it around.`
+      : `${title} Click to sort by ${label.toLowerCase()}.`;
+
+    return (
+      <th
+        aria-sort={active ? sort.direction : 'none'}
+        className={alignEnd === true ? 'cell-number' : undefined}
+        key={key}
+        scope="col"
+      >
+        <button
+          className="table-sort"
+          onClick={() => setSort(current => nextSort(current, key))}
+          title={hint}
+          type="button"
+        >
+          {label}
+          {/* A glyph, not just a colour: the arrow says which way the column runs. */}
+          <span aria-hidden="true" className="sort-mark">
+            {active ? (sort.direction === 'ascending' ? '▲' : '▼') : '↕'}
+          </span>
+        </button>
+      </th>
+    );
   }
 
   useEffect(() => {
@@ -147,7 +182,7 @@ export function AuthorsPanel({ onAssetsChanged, onClose, onNotice }: AuthorsPane
                   setEditing(null);
                   setAuthors(current => (current.some(candidate => candidate.id === author.id)
                     ? current.map(candidate => (candidate.id === author.id ? author : candidate))
-                    : [...current, author].sort((left, right) => left.label.localeCompare(right.label))));
+                    : [...current, author]));
                   onNotice(`Saved "${author.label}".`);
                 }}
               />
@@ -162,21 +197,21 @@ export function AuthorsPanel({ onAssetsChanged, onClose, onNotice }: AuthorsPane
               <table aria-label="Authors behind the prizes" className="admin-table author-table">
                 <thead>
                   <tr>
-                    <th scope="col" title="The publisher name on the store page, which is what a prize matches on.">
-                      Publisher
-                    </th>
-                    <th scope="col" title="Private: the Discord handle, which the author can change, and which names them on screen.">
-                      Handle
-                    </th>
-                    <th scope="col" title="Private: the Discord id, which does not change when the handle does.">
-                      Discord id
-                    </th>
-                    <th className="cell-number" scope="col" title="How many prizes are attached.">Prizes</th>
-                    <th aria-label="Actions" className="cell-actions" scope="col" title="Edit the author, attach prizes by publisher, or delete it." />
+                    {COLUMNS.map(column => column.key === null
+                      ? (
+                          <th
+                            aria-label={column.label}
+                            className="cell-actions"
+                            key="actions"
+                            scope="col"
+                            title={column.title}
+                          />
+                        )
+                      : header(column.key, column.label, column.title, column.alignEnd))}
                   </tr>
                 </thead>
                 <tbody>
-                  {authors.map((author) => {
+                  {rows.map((author) => {
                     const attached = author.assetCount;
 
                     return (
@@ -185,6 +220,7 @@ export function AuthorsPanel({ onAssetsChanged, onClose, onNotice }: AuthorsPane
                           <th className="cell-name" scope="row">
                             <PublisherCell author={author} />
                           </th>
+                          <td>{author.publisherId ?? <span className="muted">—</span>}</td>
                           <td>{author.discordHandle ?? <span className="muted">—</span>}</td>
                           <td>{author.discordId ?? <span className="muted">—</span>}</td>
                           <td className="cell-number" title={`${prizeCount(attached)} attached to ${author.label}.`}>
