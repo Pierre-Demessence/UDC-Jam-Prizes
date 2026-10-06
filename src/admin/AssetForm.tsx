@@ -11,7 +11,6 @@ interface AssetFormProps {
   /** The asset being edited, or `null` when a new one is being added. */
   editing: AdminAsset | null;
   metadata: AssetInput | null;
-  onCancel: () => void;
   onSaved: (asset: AdminAsset) => void;
 }
 
@@ -44,7 +43,7 @@ function toInput(asset: AdminAsset): AssetInput {
 }
 
 /** Add or edit one prize. Every field stays editable, whatever the page gave us. */
-export function AssetForm({ editing, metadata, onCancel, onSaved }: AssetFormProps) {
+export function AssetForm({ editing, metadata, onSaved }: AssetFormProps) {
   // The parent remounts this form when the draft changes (through its `key`),
   // so the fields start from the draft and stay put while it is being edited.
   const [source, setSource] = useState<AssetInput | null>(() => (editing === null ? metadata : toInput(editing)));
@@ -145,9 +144,7 @@ export function AssetForm({ editing, metadata, onCancel, onSaved }: AssetFormPro
   }
 
   return (
-    <section className="panel">
-      <h2>{editing === null ? 'Add a prize' : `Edit "${editing.name}"`}</h2>
-
+    <div className="modal-form">
       <div className="field-row">
         <label className="field field-grow">
           <span>Asset Store URL</span>
@@ -223,7 +220,6 @@ export function AssetForm({ editing, metadata, onCancel, onSaved }: AssetFormPro
                     <div className="field-wide">
                       <AuthorForm
                         editing={null}
-                        onCancel={() => setChoosingAuthor(false)}
                         onSaved={(author) => {
                           setAuthors(current => [...current, author].sort((left, right) => left.label.localeCompare(right.label)));
                           update('authorId', author.id);
@@ -273,7 +269,6 @@ export function AssetForm({ editing, metadata, onCancel, onSaved }: AssetFormPro
                 <button className="button" disabled={busy} type="submit">
                   {editing === null ? 'Save the prize' : 'Save changes'}
                 </button>
-                <button className="button-quiet" onClick={onCancel} type="button">Cancel</button>
               </div>
             </form>
           )}
@@ -282,6 +277,6 @@ export function AssetForm({ editing, metadata, onCancel, onSaved }: AssetFormPro
       {source?.imageUrl == null || source.imageUrl === ''
         ? null
         : <img alt="" className="preview" src={source.imageUrl} />}
-    </section>
+    </div>
   );
 }

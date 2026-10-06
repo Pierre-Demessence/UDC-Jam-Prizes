@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 
 import { AuthorForm } from '@/admin/AuthorForm';
+import { Modal } from '@/admin/Modal';
 import { api } from '@/api';
 
 import type { AdminAsset, AdminAuthor } from '../../server/payloads.ts';
@@ -107,7 +108,7 @@ export function AuthorsPanel({ onAssetsChanged, onClose, onNotice }: AuthorsPane
             className="button"
             onClick={() => {
               setEditing(null);
-              setCreating(current => !current);
+              setCreating(true);
             }}
             type="button"
           >
@@ -119,22 +120,26 @@ export function AuthorsPanel({ onAssetsChanged, onClose, onNotice }: AuthorsPane
 
       {creating || editing !== null
         ? (
-            <AuthorForm
-              editing={editing}
-              key={editing?.id ?? 'new'}
-              onCancel={() => {
+            <Modal
+              onClose={() => {
                 setCreating(false);
                 setEditing(null);
               }}
-              onSaved={(author) => {
-                setCreating(false);
-                setEditing(null);
-                setAuthors(current => (current.some(candidate => candidate.id === author.id)
-                  ? current.map(candidate => (candidate.id === author.id ? author : candidate))
-                  : [...current, author].sort((left, right) => left.label.localeCompare(right.label))));
-                onNotice(`Saved "${author.label}".`);
-              }}
-            />
+              title={editing === null ? 'New author' : `Edit "${editing.label}"`}
+            >
+              <AuthorForm
+                editing={editing}
+                key={editing?.id ?? 'new'}
+                onSaved={(author) => {
+                  setCreating(false);
+                  setEditing(null);
+                  setAuthors(current => (current.some(candidate => candidate.id === author.id)
+                    ? current.map(candidate => (candidate.id === author.id ? author : candidate))
+                    : [...current, author].sort((left, right) => left.label.localeCompare(right.label))));
+                  onNotice(`Saved "${author.label}".`);
+                }}
+              />
+            </Modal>
           )
         : null}
 

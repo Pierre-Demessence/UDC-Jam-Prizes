@@ -4,6 +4,7 @@ import { AssetForm } from '@/admin/AssetForm';
 import { AssetTable } from '@/admin/AssetTable';
 import { AuthorsPanel } from '@/admin/AuthorsPanel';
 import { BulkImport } from '@/admin/BulkImport';
+import { Modal } from '@/admin/Modal';
 import { api } from '@/api';
 
 import type { ImportOutcome } from '../../server/import-assets.ts';
@@ -243,13 +244,17 @@ export function Admin() {
               {draft === null
                 ? null
                 : (
-                    <AssetForm
-                      editing={draft.editing}
-                      key={draft.editing?.id ?? draft.metadata?.assetId ?? 'new'}
-                      metadata={draft.metadata}
-                      onCancel={() => setDraft(null)}
-                      onSaved={afterSave}
-                    />
+                    <Modal
+                      onClose={() => setDraft(null)}
+                      title={draft.editing === null ? 'Add a prize' : `Edit "${draft.editing.name}"`}
+                    >
+                      <AssetForm
+                        editing={draft.editing}
+                        key={draft.editing?.id ?? draft.metadata?.assetId ?? 'new'}
+                        metadata={draft.metadata}
+                        onSaved={afterSave}
+                      />
+                    </Modal>
                   )}
 
               {assets.length === 0

@@ -17,7 +17,6 @@ function blockEnter(event: React.KeyboardEvent<HTMLInputElement>): void {
 interface AuthorFormProps {
   /** The author being edited, or `null` when a new one is being created. */
   editing: AdminAuthor | null;
-  onCancel: () => void;
   onSaved: (author: AdminAuthor) => void;
   /**
    * Prefills a new author from the prize in hand: the store publisher is the key
@@ -31,7 +30,7 @@ interface AuthorFormProps {
  * spot) and the author panel (which edits one). It is a div rather than a form
  * because it is rendered inside the prize form, and a form cannot nest.
  */
-export function AuthorForm({ editing, onCancel, onSaved, publisher = null }: AuthorFormProps) {
+export function AuthorForm({ editing, onSaved, publisher = null }: AuthorFormProps) {
   const [publisherName, setPublisherName] = useState(() => editing?.publisher ?? publisher ?? '');
   const [handle, setHandle] = useState(() => editing?.discordHandle ?? '');
   const [discordId, setDiscordId] = useState(() => editing?.discordId ?? '');
@@ -102,7 +101,6 @@ export function AuthorForm({ editing, onCancel, onSaved, publisher = null }: Aut
         >
           {editing === null ? 'Add the author' : 'Save the author'}
         </button>
-        <button className="button-quiet" onClick={onCancel} type="button">Cancel</button>
       </div>
 
       <p className="hint field-wide">
