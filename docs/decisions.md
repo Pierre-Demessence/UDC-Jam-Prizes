@@ -243,7 +243,7 @@ installed; accessibility is checked in review and in the browser instead.
 
 ## One stateful pod, synced from GitOps
 
-The app deploys to the Corniland cluster as a single replica of an image that serves the API and the
+The app deploys to a Kubernetes cluster as a single replica of an image that serves the API and the
 built client, with the SQLite file on a `ReadWriteOnce` PVC, and `Recreate` rather than `RollingUpdate`:
 SQLite is a single writer, so a second pod would either wait for a volume only one may hold or mount the
 same file twice. That is also why there is no second replica, no PodDisruptionBudget and no autoscaler.
@@ -304,4 +304,3 @@ The lookup comes first — one synchronous call, with no await between the find 
 batch, or a second prize from the same publisher, resolves to one record. An id another author already
 holds is left where it is and the new record goes without it: a rename leaves the old record keeping
 the id while the store serves a new name, and the unique index refuses a second holder.
-

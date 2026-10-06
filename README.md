@@ -78,7 +78,7 @@ proxy, set `TRUSTED_PROXY_ALLOWLIST` to the proxy's own addresses so the app rea
 
 ## Deploying
 
-The app runs on the Corniland Kubernetes cluster through ArgoCD. On a green CI run,
+The app runs on a Kubernetes cluster through ArgoCD. On a green CI run,
 `.github/workflows/deploy.yml` builds the image, pushes it to GHCR and pins its immutable tag in
 `k8s/prod/deployment.yaml`; the ArgoCD `Application` that syncs that path lives in the cluster's GitOps
 repository. The image is one process serving the API and the built client.
