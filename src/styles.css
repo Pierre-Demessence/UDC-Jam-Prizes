@@ -570,12 +570,6 @@ button:disabled {
   cursor: pointer;
 }
 
-/* The author table's headers are plain text rather than sort buttons, and the
-   padding above belongs to the button, so these cells pad themselves. */
-.author-table thead th {
-  padding: 10px 12px;
-}
-
 .admin-table th.cell-number .table-sort {
   justify-content: flex-end;
 }
