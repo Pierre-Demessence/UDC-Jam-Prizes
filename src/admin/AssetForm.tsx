@@ -5,12 +5,12 @@ import { AuthorForm } from '@/admin/AuthorForm';
 import { api } from '@/api';
 
 import type { AdminAsset, AdminAuthor } from '../../server/payloads.ts';
-import type { AssetInput } from '../../server/validate.ts';
+import type { AssetInput, MetadataPrefill } from '../../server/validate.ts';
 
 interface AssetFormProps {
   /** The asset being edited, or `null` when a new one is being added. */
   editing: AdminAsset | null;
-  metadata: AssetInput | null;
+  metadata: MetadataPrefill | null;
   onSaved: (asset: AdminAsset) => void;
 }
 
@@ -53,6 +53,9 @@ export function AssetForm({ editing, metadata, onSaved }: AssetFormProps) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [price, setPrice] = useState(() => toPriceInput(editing?.priceCents ?? metadata?.priceCents ?? null));
+  // The publisher id is the author's, not the prize's, so it stays out of
+  // `source` — which is what gets saved — and is handed to the author form.
+  const [publisherId, setPublisherId] = useState(() => metadata?.publisherId ?? null);
 
   // The author list is small and barely changes, so one read per form is enough.
   useEffect(() => {
@@ -78,6 +81,7 @@ export function AssetForm({ editing, metadata, onSaved }: AssetFormProps) {
       publisher: null,
     });
     setPrice('');
+    setPublisherId(null);
     setMessage(null);
   }
 
@@ -88,6 +92,7 @@ export function AssetForm({ editing, metadata, onSaved }: AssetFormProps) {
     try {
       const lookup = await api.metadata(url);
       setSource(lookup.metadata);
+      setPublisherId(lookup.metadata.publisherId);
       setPrice(toPriceInput(lookup.metadata.priceCents));
       setUrl(lookup.metadata.assetUrl);
 
@@ -226,6 +231,7 @@ export function AssetForm({ editing, metadata, onSaved }: AssetFormProps) {
                           setChoosingAuthor(false);
                         }}
                         publisher={source.publisher}
+                        publisherId={publisherId}
                       />
                     </div>
                   )

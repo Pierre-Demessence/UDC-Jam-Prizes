@@ -12,10 +12,10 @@ const DISCOUNTED_URL = 'https://assetstore.unity.com/packages/3d/characters/huma
 const realPage = readFileSync(new URL('./fixtures/asset-page.html', import.meta.url), 'utf8');
 const discountedPage = readFileSync(new URL('./fixtures/asset-page-discounted.html', import.meta.url), 'utf8');
 
-function pageWith(ldJson: unknown, state?: string): string {
+function pageWith(ldJson: unknown, state?: string, body = ''): string {
   const embedded = state === undefined ? '' : `<script>var state = ${state};</script>`;
 
-  return `<html><head><script type="application/ld+json">${JSON.stringify(ldJson)}</script>${embedded}</head><body></body></html>`;
+  return `<html><head><script type="application/ld+json">${JSON.stringify(ldJson)}</script>${embedded}</head><body>${body}</body></html>`;
 }
 
 function product(overrides: Record<string, unknown> = {}): Record<string, unknown> {
@@ -42,11 +42,14 @@ describe('parseAssetPage on a real Asset Store page', () => {
   it('reads the fields the catalogue needs', () => {
     expect(metadata.name).toBe('Text Animator for Unity | UI Toolkit and Text Mesh Pro');
     expect(metadata.publisher).toBe('Febucci');
+    expect(metadata.publisherId).toBe('45737');
     expect(metadata.assetId).toBe('341308');
   });
 
-  it('reads the price from the product offer', () => {
-    expect(metadata.priceCents).toBe(3250);
+  it('stores the list price rather than the offer price while the page is discounted', () => {
+    // The page was on sale when it was captured: the offer carries 32.50, and the
+    // page's own entry (59.80 against 29.90) doubles it back to the 65.00 list price.
+    expect(metadata.priceCents).toBe(6500);
   });
 
   it('makes the image absolute, since the page serves it protocol-relative', () => {
@@ -76,6 +79,7 @@ describe('parseAssetPage when the asset is on sale', () => {
     expect(metadata.name).toBe('P09_Modular_Humanoid_Lite');
     expect(metadata.assetId).toBe('317283');
     expect(metadata.publisher).toBe('Sabao3179');
+    expect(metadata.publisherId).toBe('54696');
     expect(metadata.category).toBe('3d/characters/humanoids/fantasy');
     expect(metadata.imageUrl).toBe('https://assetstorev1-prd-cdn.unity3d.com/key-image/41951b3c-583b-4fce-bb93-0f4538c375fc.jpg');
   });
@@ -206,5 +210,52 @@ describe('parseAssetPage on the fields worth getting right', () => {
 
     expect(() => parseAssetPage(pageWith(product({ offers: undefined })), url))
       .toThrow(/asset id/i);
+  });
+});
+
+describe('the publisher id', () => {
+  const byline = '<div class="byline"><a href="/publishers/45737"><div class="avatar">F</div><div class="name">Febucci</div></a></div>';
+
+  it('reads it from the anchor that sits beside the asset title', () => {
+    expect(parseAssetPage(pageWith(product(), undefined, `<h1>A Tool</h1>${byline}`), PAGE_URL).publisherId).toBe('45737');
+  });
+
+  it('keeps the id as text, since it is a label and not a quantity', () => {
+    const html = pageWith(product(), undefined, '<h1>A Tool</h1><a href="/publishers/0012345">P</a>');
+
+    expect(parseAssetPage(html, PAGE_URL).publisherId).toBe('0012345');
+  });
+
+  it('takes the byline anchor, not a publisher link in the page\'s own data', () => {
+    // The two shapes the live page carries besides the byline: a description
+    // linking another publisher, escaped inside the JSON-LD (so its quotes arrive
+    // as \"), and the embedded state's top-rated list, whose links carry no
+    // `href=`. Neither can pass for the byline anchor the reader looks for.
+    const description = 'Pairs with <a href="https://assetstore.unity.com/publishers/44630">Mini set</a>.';
+    const state = JSON.stringify({ topRated: [{ name: 'Muka Schultze', link: '/publishers/15803' }] });
+
+    expect(parseAssetPage(pageWith(product({ description }), state, `<h1>A Tool</h1>${byline}`), PAGE_URL).publisherId).toBe('45737');
+  });
+
+  it('ignores an anchor that comes before the title', () => {
+    // The reader starts after `</h1>`: the byline is what follows the title, and a
+    // link above it belongs to whatever else the page carries.
+    const body = `<a href="/publishers/99999">Something else</a><h1>A Tool</h1>${byline}`;
+
+    expect(parseAssetPage(pageWith(product(), undefined, body), PAGE_URL).publisherId).toBe('45737');
+  });
+
+  it('has no publisher id when the anchor is not a number', () => {
+    const body = '<h1>A Tool</h1><a href="/publishers/febucci">Febucci</a>';
+
+    expect(parseAssetPage(pageWith(product(), undefined, body), PAGE_URL).publisherId).toBeNull();
+  });
+
+  it('has no publisher id when the page carries no anchor', () => {
+    expect(parseAssetPage(pageWith(product()), PAGE_URL).publisherId).toBeNull();
+  });
+
+  it('has none when there is no title to read it from', () => {
+    expect(parseAssetPage(pageWith(product(), undefined, byline), PAGE_URL).publisherId).toBeNull();
   });
 });

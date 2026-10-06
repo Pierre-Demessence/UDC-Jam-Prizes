@@ -7,7 +7,7 @@ import process from 'node:process';
 
 import type { Config } from './config.ts';
 import type { DatabaseHandle } from './db.ts';
-import type { AuthorInput } from './validate.ts';
+import type { AuthorInput, MetadataPrefill } from './validate.ts';
 
 import {
   createRateLimiter,
@@ -38,6 +38,7 @@ import {
   findAuthorByDiscordId,
   findAuthorById,
   findAuthorByPublisher,
+  findAuthorByPublisherId,
   listAuthors,
   publicCatalogue,
   updateAsset,
@@ -91,6 +92,12 @@ function authorClash(db: DatabaseHandle['db'], input: AuthorInput, ignoreId?: nu
     const taken = findAuthorByPublisher(db, input.publisher);
     if (taken !== null && taken.id !== ignoreId)
       return `"${authorLabel(taken)}" already publishes as ${input.publisher}. One author per publisher is what lets a prize find its author on its own.`;
+  }
+
+  if (input.publisherId !== null) {
+    const taken = findAuthorByPublisherId(db, input.publisherId);
+    if (taken !== null && taken.id !== ignoreId)
+      return `That store publisher id already belongs to "${authorLabel(taken)}".`;
   }
 
   if (input.discordHandle !== null) {
@@ -281,10 +288,17 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
       // The publisher is what ties a prize to its author, so a known one is
       // preselected: reading a batch from a dozen authors is then no typing.
       const author = findAuthorByPublisher(db, metadata.publisher);
+      // The publisher id rides along with the prefill so the form can hand it to
+      // the author it creates; it is not a column of the prize.
+      const prefill: MetadataPrefill = {
+        ...assetInputFromMetadata(metadata),
+        authorId: author?.id ?? null,
+        publisherId: metadata.publisherId,
+      };
 
       return c.json({
         existingAsset: existing === null ? null : { id: existing.id, name: existing.name },
-        metadata: { ...assetInputFromMetadata(metadata), authorId: author?.id ?? null },
+        metadata: prefill,
       });
     }
     catch (cause) {

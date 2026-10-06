@@ -19,6 +19,12 @@ export interface PublicAsset {
   imageUrl: string | null;
   priceCents: number | null;
   publisher: string | null;
+  /**
+   * The publisher's Unity id, which the store link is built from. It belongs to
+   * the author record and is joined in for the public page: null while no author
+   * is attached, or when theirs carries no id.
+   */
+  publisherId: string | null;
 }
 
 export interface CatalogueTotals {
@@ -55,6 +61,8 @@ export interface AdminAuthor {
   discordId: string | null;
   /** The store publisher string prizes match on, or null when it is not known. */
   publisher: string | null;
+  /** Unity's publisher id, which the store link is built from, or null. */
+  publisherId: string | null;
 }
 
 export interface AdminAsset extends PublicAsset {
@@ -84,7 +92,7 @@ function readableKeyValue(stored: string, secret: string): string {
   }
 }
 
-export function toPublicAsset(asset: Asset): PublicAsset {
+export function toPublicAsset(asset: Asset, publisherId: string | null): PublicAsset {
   return {
     id: asset.id,
     name: asset.name,
@@ -94,6 +102,7 @@ export function toPublicAsset(asset: Asset): PublicAsset {
     imageUrl: asset.imageUrl,
     priceCents: asset.priceCents,
     publisher: asset.publisher,
+    publisherId,
   };
 }
 
@@ -113,12 +122,13 @@ export function toAdminAuthor(author: Author, assetCount: number): AdminAuthor {
     discordId: author.discordId,
     label: authorLabel(author),
     publisher: author.publisher,
+    publisherId: author.publisherId,
   };
 }
 
 export function toAdminAsset(asset: Asset, author: AdminAuthor | null, keys: Key[], secret: string): AdminAsset {
   return {
-    ...toPublicAsset(asset),
+    ...toPublicAsset(asset, author?.publisherId ?? null),
     author,
     createdAt: asset.createdAt.toISOString(),
     hidden: asset.hidden,

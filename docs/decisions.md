@@ -261,3 +261,26 @@ a restored volume readable.
 `TRUSTED_PROXY_ALLOWLIST` is set to the node's pod range, so the app reads the caller the ingress named;
 `ADMIN_IP_ALLOWLIST` stays unset because the pin lives at the edge instead (see "The admin can be
 pinned to known addresses").
+
+## The publisher id lives on the author, and the public catalogue joins it
+
+Unity renders the publisher of an asset as an anchor beside the title, `/publishers/<id>`, and its
+JSON-LD `brand` carries a name only, so the scrape reads that anchor and stores the id on the author
+(`authors.publisher_id`). An author is already one record per publisher, so a per-prize copy would
+repeat the same number on every prize they donated, and the link it builds is the same for all of
+them.
+
+Rejected: **the id on the asset.** It would keep the public catalogue a single-table read, but it
+duplicates a publisher-level fact on every prize and gives one column two meanings.
+
+Rejected: **the id on the author *and* the publisher name moved there**, so the asset row holds no
+store identity at all. The publisher string on the asset is what `attachAuthorByPublisher` matches on
+and what a prize shows before any author exists; moving it would break attaching a back catalogue in
+one click and blank the publisher on every unmatched prize.
+
+The public payload carries the id (`publisherId`), not a built URL: the id is the store's fact, and
+building a link from it is a display concern the client does in one place (`publisherPageUrl`). The
+catalogue therefore LEFT JOINs `authors`, so a public response reads one column from a private table —
+the publisher id alone, the name it belongs to being public already. Rejected: **matching authors on
+the id as well**, which the id would allow; the name stays the only matching rule for now.
+

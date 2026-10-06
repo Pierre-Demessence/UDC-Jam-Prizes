@@ -44,15 +44,16 @@ client and the API, which is what a deployment would run.
 
 ## What it does
 
-- **Public page** (`/`) — every donated asset with its image, publisher, category and price, plus a
-  search box, a category filter, sorting and a totals line. No login, and no private field is ever
-  sent to the browser.
+- **Public page** (`/`) — every donated asset with its image, publisher (linked to their store page
+  when it is known), category and price, plus a search box, a category filter, sorting and a totals
+  line. No login, and no private field is ever sent to the browser.
 - **Admin** (`/admin`) — sign in with `ADMIN_PASSWORD`, paste an Asset Store URL and have the name,
-  image, publisher, category, price and Unity id filled in from the page, attach the author, and keep
+  image, publisher and their store page id, category, price and the asset's Unity id filled in from the
+  page, attach the author, and keep
   internal notes; paste the keys the author sends — the count is what the row reports, and the *Needed*
   field says how many you asked for.
   Authors are a list of their own (*Authors* in the toolbar): one record per person with their store
-  publisher, Discord handle and Discord id, shared by every prize they donated, shown by their handle
+  publisher and its id, Discord handle and Discord id, shared by every prize they donated, shown by their handle
   and by their publisher when the handle is not known yet. A prize whose publisher already belongs to
   an author picks it up by itself, and *Attach every matching prize* links a whole back catalogue in
   one click.

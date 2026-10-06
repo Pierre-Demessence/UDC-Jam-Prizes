@@ -7,9 +7,15 @@
  * that same markup to a plain HTTP client. Prices are USD: a server-side request
  * gets USD from Unity, so no currency is stored with them — an offer that declares
  * another currency is refused rather than valued as dollars.
+ *
+ * The publisher id is the one field that block does not carry: its `brand` holds a
+ * name only, so the id comes from the publisher anchor beside the asset title.
  */
 
-/** The catalogue fields an Asset Store page can fill in. */
+/**
+ * The fields an Asset Store page can fill in. The publisher id is the author's,
+ * not the prize's: it travels with the metadata so the prefill can hand it on.
+ */
 export interface AssetMetadata {
   name: string;
   assetId: string;
@@ -18,6 +24,12 @@ export interface AssetMetadata {
   imageUrl: string | null;
   priceCents: number | null;
   publisher: string | null;
+  /**
+   * Unity's publisher id, kept as text — it is a label, not a quantity. It is the
+   * author's field rather than the prize's, so it is carried here for the prefill
+   * to hand on, not stored on the asset.
+   */
+  publisherId: string | null;
 }
 
 /** A page that could not be read, with a message worth showing to the admin. */
@@ -32,6 +44,8 @@ const LD_JSON_BLOCK = /<script[^>]+type="application\/ld\+json"[^>]*>([\s\S]*?)<
 const CENTS = 100;
 const USD = 'USD';
 const TRAILING_ID = /(\d+)\/?$/;
+const TITLE_END = /<\/h1\s*>/i;
+const PUBLISHER_LINK = /href="\/publishers\/(\d+)"/;
 
 const ENTITIES: Record<string, string> = {
   '&#39;': '\'',
@@ -213,6 +227,23 @@ function assetIdFrom(url: URL, offerUrl: unknown): string | null {
 }
 
 /**
+ * Unity's publisher id, read from the anchor that follows the asset title.
+ *
+ * The JSON-LD `brand` carries a name only, so this link is the one place the id
+ * appears. The search starts after `</h1>` because an asset description can hold
+ * `/publishers/<id>` links of its own, and those are other people's pages. A page
+ * without the anchor, or with older markup, yields nothing — the other fields are
+ * still worth reading.
+ */
+function publisherIdFromPage(html: string): string | null {
+  const title = TITLE_END.exec(html);
+  if (title === null)
+    return null;
+
+  return PUBLISHER_LINK.exec(html.slice(title.index + title[0].length))?.[1] ?? null;
+}
+
+/**
  * Parses the fields the catalogue needs. `pageUrl` is the canonical address of
  * the page: relative image URLs and the asset id are resolved against it.
  */
@@ -243,6 +274,7 @@ export function parseAssetPage(html: string, pageUrl: string): AssetMetadata {
     category: categoryFromPath(url),
     imageUrl: image ? new URL(image, url).href : null,
     publisher: asNonEmptyString((product.brand as { name?: unknown } | undefined)?.name),
+    publisherId: publisherIdFromPage(html),
     priceCents: offerCents === null || ratio === null
       ? offerCents
       : Math.round(offerCents * ratio),

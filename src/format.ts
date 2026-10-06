@@ -49,3 +49,13 @@ export function formatCategory(category: string | null): string | null {
 
   return segments.length === 0 ? null : segments.join(' › ');
 }
+
+const STORE_PUBLISHER_URL = 'https://assetstore.unity.com/publishers/';
+
+/**
+ * The store page of a prize's publisher, or nothing when the id is unknown: the
+ * name still shows, it simply cannot be linked.
+ */
+export function publisherPageUrl(publisherId: string | null): string | null {
+  return publisherId === null ? null : `${STORE_PUBLISHER_URL}${publisherId}`;
+}

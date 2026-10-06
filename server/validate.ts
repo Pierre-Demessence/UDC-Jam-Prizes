@@ -24,6 +24,8 @@ const MAX_KEY = 200;
 const MAX_HANDLE = 100;
 /** A Discord snowflake: digits only, and never a JS number, which would lose precision. */
 const DISCORD_ID = /^\d{17,20}$/;
+/** Unity's publisher id, digits only, as it appears in `/publishers/<id>`. */
+const PUBLISHER_ID = /^\d+$/;
 /** Nobody is going to hand out more keys than this for one prize. */
 const MAX_NEEDED = 999;
 /** One paste of links, so a single request cannot turn into a long crawl. */
@@ -43,6 +45,15 @@ export interface AssetInput {
 }
 
 /**
+ * What the metadata lookup answers with: the prize fields the page filled in,
+ * plus the publisher id. The id belongs to the author being created, not to the
+ * prize, so it travels beside `AssetInput` rather than inside it.
+ */
+export interface MetadataPrefill extends AssetInput {
+  publisherId: string | null;
+}
+
+/**
  * One author. No field is required on its own, but at least one of the three
  * identifying ones must be given: a record with none of them could not be found
  * again, contacted, or told apart from the next one.
@@ -51,6 +62,12 @@ export interface AuthorInput {
   discordHandle: string | null;
   discordId: string | null;
   publisher: string | null;
+  /**
+   * Unity's publisher id, from the store page. A companion to `publisher` rather
+   * than an identifier on its own: prizes match on the name, and this is what the
+   * store link is built from.
+   */
+  publisherId: string | null;
 }
 
 function text(value: unknown, field: string, max: number, required: boolean): Validation<string | null> {
@@ -194,6 +211,9 @@ export function parseAuthorInput(body: unknown): Validation<AuthorInput> {
   const discordHandle = text(raw.discordHandle, 'The Discord handle', MAX_HANDLE, false);
   const discordId = text(raw.discordId, 'The Discord id', 30, false);
   const publisher = text(raw.publisher, 'The publisher', MAX_NAME, false);
+  // Loose on purpose: a pasted address is long, and the pattern below is what
+  // actually decides, so this cap only ever fires on absurd input.
+  const publisherId = text(raw.publisherId, 'The publisher id', MAX_NAME, false);
 
   if (!discordHandle.ok)
     return discordHandle;
@@ -201,9 +221,15 @@ export function parseAuthorInput(body: unknown): Validation<AuthorInput> {
     return discordId;
   if (!publisher.ok)
     return publisher;
+  if (!publisherId.ok)
+    return publisherId;
 
   if (discordId.value !== null && !DISCORD_ID.test(discordId.value))
     return { error: 'The Discord id is the 17 to 20 digit number Discord shows; the handle is the name beside it.', ok: false };
+
+  // A url or a name here would build a store link that goes nowhere.
+  if (publisherId.value !== null && !PUBLISHER_ID.test(publisherId.value))
+    return { error: 'The publisher id is the number in the store address, like 45737.', ok: false };
 
   if (discordHandle.value === null && discordId.value === null && publisher.value === null)
     return { error: 'An author needs a store publisher, a Discord handle or a Discord id.', ok: false };
@@ -214,6 +240,7 @@ export function parseAuthorInput(body: unknown): Validation<AuthorInput> {
       discordHandle: discordHandle.value,
       discordId: discordId.value,
       publisher: publisher.value,
+      publisherId: publisherId.value,
     },
   };
 }

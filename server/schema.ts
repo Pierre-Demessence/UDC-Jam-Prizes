@@ -20,6 +20,11 @@ import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
  * on it. It is unique among authors, because a preselect that could mean two
  * people is worse than none — the second author claiming a publisher is refused
  * with a readable sentence instead.
+ *
+ * `publisherId` is Unity's own id for that publisher, kept as text like
+ * `assets.assetId`. The name above is what a prize matches on, and a publisher can
+ * rename themselves; the id does not change, so it is what the store link is built
+ * from. Unique for the same reason the name is.
  */
 export const authors = sqliteTable('authors', {
   id: integer('id').primaryKey({ autoIncrement: true }),
@@ -27,6 +32,7 @@ export const authors = sqliteTable('authors', {
   discordHandle: text('discord_handle').unique(),
   discordId: text('discord_id').unique(),
   publisher: text('publisher').unique(),
+  publisherId: text('publisher_id').unique(),
   updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
     .notNull()
     .$defaultFn(() => new Date())

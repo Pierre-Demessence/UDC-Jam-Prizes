@@ -1,6 +1,6 @@
 import type { ImportOutcome } from '../server/import-assets.ts';
 import type { AdminAsset, AdminAuthor, CatalogueTotals, PublicAsset } from '../server/payloads.ts';
-import type { AssetInput, AuthorInput } from '../server/validate.ts';
+import type { AssetInput, AuthorInput, MetadataPrefill } from '../server/validate.ts';
 
 export interface Catalogue {
   assets: PublicAsset[];
@@ -9,7 +9,7 @@ export interface Catalogue {
 
 export interface MetadataLookup {
   existingAsset: { id: number; name: string } | null;
-  metadata: AssetInput;
+  metadata: MetadataPrefill;
 }
 
 export class ApiError extends Error {

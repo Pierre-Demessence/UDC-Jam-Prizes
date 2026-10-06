@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { describeTotals, formatAssetCount, formatCategory, formatPrice, totalsTooltip } from '@/format';
+import { describeTotals, formatAssetCount, formatCategory, formatPrice, publisherPageUrl, totalsTooltip } from '@/format';
 
 describe('formatPrice', () => {
   it('renders cents as a currency amount', () => {
@@ -51,5 +51,15 @@ describe('formatCategory', () => {
     expect(formatCategory(null)).toBeNull();
     expect(formatCategory('')).toBeNull();
     expect(formatCategory('///')).toBeNull();
+  });
+});
+
+describe('publisherPageUrl', () => {
+  it('builds the publisher store page from the id', () => {
+    expect(publisherPageUrl('45737')).toBe('https://assetstore.unity.com/publishers/45737');
+  });
+
+  it('has no link while the id is unknown', () => {
+    expect(publisherPageUrl(null)).toBeNull();
   });
 });

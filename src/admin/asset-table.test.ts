@@ -19,6 +19,7 @@ function asset(overrides: Partial<AdminAsset> & { name: string }): AdminAsset {
     notes: null,
     priceCents: null,
     publisher: null,
+    publisherId: null,
     updatedAt: '2024-01-01T00:00:00.000Z',
     ...overrides,
   };
@@ -32,6 +33,7 @@ function author(overrides: Partial<AdminAuthor> & { label: string }): AdminAutho
     discordId: null,
     label: overrides.label,
     publisher: null,
+    publisherId: null,
   };
 
   return { ...defaults, ...overrides };

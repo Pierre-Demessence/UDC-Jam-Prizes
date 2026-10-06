@@ -23,6 +23,11 @@ interface AuthorFormProps {
    * prizes match on, so carrying it over is what makes the next prize find them.
    */
   publisher?: string | null;
+  /**
+   * The publisher id the store page gave, which the store link is built from. It
+   * is a companion to the name, not a field a prize matches on.
+   */
+  publisherId?: string | null;
 }
 
 /**
@@ -30,8 +35,9 @@ interface AuthorFormProps {
  * spot) and the author panel (which edits one). It is a div rather than a form
  * because it is rendered inside the prize form, and a form cannot nest.
  */
-export function AuthorForm({ editing, onSaved, publisher = null }: AuthorFormProps) {
+export function AuthorForm({ editing, onSaved, publisher = null, publisherId = null }: AuthorFormProps) {
   const [publisherName, setPublisherName] = useState(() => editing?.publisher ?? publisher ?? '');
+  const [storeId, setStoreId] = useState(() => editing?.publisherId ?? publisherId ?? '');
   const [handle, setHandle] = useState(() => editing?.discordHandle ?? '');
   const [discordId, setDiscordId] = useState(() => editing?.discordId ?? '');
   const [busy, setBusy] = useState(false);
@@ -49,6 +55,7 @@ export function AuthorForm({ editing, onSaved, publisher = null }: AuthorFormPro
       discordHandle: handle.trim() === '' ? null : handle.trim(),
       discordId: discordId.trim() === '' ? null : discordId.trim(),
       publisher: publisherName.trim() === '' ? null : publisherName.trim(),
+      publisherId: storeId.trim() === '' ? null : storeId.trim(),
     };
 
     try {
@@ -72,6 +79,18 @@ export function AuthorForm({ editing, onSaved, publisher = null }: AuthorFormPro
           onKeyDown={blockEnter}
           placeholder="the name on the Asset Store page"
           value={publisherName}
+        />
+      </label>
+
+      <label className="field">
+        <span>Store publisher id</span>
+        <input
+          inputMode="numeric"
+          onChange={event => setStoreId(event.target.value)}
+          onKeyDown={blockEnter}
+          placeholder="45737"
+          title="The number in the publisher's store address, /publishers/45737. Read from the page when the prize was scraped; it is what the store link is built from."
+          value={storeId}
         />
       </label>
 
@@ -105,7 +124,8 @@ export function AuthorForm({ editing, onSaved, publisher = null }: AuthorFormPro
 
       <p className="hint field-wide">
         The handle names this author on screen; the publisher is what every prize
-        published under it matches on. Give at least one.
+        published under it matches on. Give at least one. The id is optional: it
+        only adds a link to their store page.
       </p>
 
       {message === null ? null : <p className="hint" role="alert">{message}</p>}

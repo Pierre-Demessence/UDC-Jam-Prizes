@@ -68,6 +68,25 @@ function productEntry(html, assetId) {
   return object === null ? null : `{"${assetId}":${object}}`;
 }
 
+/**
+ * The header slice: the `<h1>` title and the publisher anchor that follows it.
+ * The publisher id is not in the JSON-LD — its `brand` carries a name only — so
+ * this real markup is the one thing the parser reads it from.
+ */
+function headerSlice(html) {
+  const bodyAt = html.indexOf('<body');
+  const titleAt = html.indexOf('<h1', bodyAt === -1 ? 0 : bodyAt);
+  if (titleAt === -1)
+    return null;
+
+  const anchorAt = html.indexOf('/publishers/', titleAt);
+  if (anchorAt === -1)
+    return null;
+
+  const anchorEnd = html.indexOf('</a>', anchorAt);
+  return anchorEnd === -1 ? null : html.slice(titleAt, anchorEnd + '</a>'.length);
+}
+
 const only = process.argv[2];
 
 mkdirSync('server/fixtures', { recursive: true });
@@ -82,6 +101,7 @@ for (const [file, url] of Object.entries(PAGES)) {
   const metas = html.match(META) ?? [];
   const blocks = [...html.matchAll(LD_JSON)].map(match => match[1].trim());
   const state = productEntry(html, /(\d+)\/?$/.exec(new URL(url).pathname)?.[1] ?? '');
+  const header = headerSlice(html);
   const fixture = [
     '<!doctype html>',
     '<html lang="en">',
@@ -90,12 +110,14 @@ for (const [file, url] of Object.entries(PAGES)) {
     ...blocks.map(block => `<script type="application/ld+json">${block}</script>`),
     ...(state === null ? [] : [`<script type="application/json" id="product-state">${state}</script>`]),
     '</head>',
-    '<body></body>',
+    '<body>',
+    ...(header === null ? [] : [header]),
+    '</body>',
     '</html>',
     '',
   ].join('\n');
 
   writeFileSync(`server/fixtures/${file}`, fixture);
 
-  console.log(`${file}: ${response.status}, ${fixture.length} bytes, ${metas.length} meta tags, ${blocks.length} ld+json blocks, product entry ${state === null ? 'not found' : 'captured'}`);
+  console.log(`${file}: ${response.status}, ${fixture.length} bytes, ${metas.length} meta tags, ${blocks.length} ld+json blocks, product entry ${state === null ? 'not found' : 'captured'}, publisher anchor ${header === null ? 'not found' : 'captured'}`);
 }

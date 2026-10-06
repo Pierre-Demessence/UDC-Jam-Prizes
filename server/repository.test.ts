@@ -198,6 +198,7 @@ describe('the authors behind the prizes', () => {
       discordHandle: 'priya',
       discordId: '123456789012345678',
       publisher: 'VIVID Arts',
+      publisherId: null,
       ...overrides,
     });
   }

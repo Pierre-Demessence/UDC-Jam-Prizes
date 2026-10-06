@@ -14,6 +14,7 @@ function asset(overrides: Partial<PublicAsset>): PublicAsset {
     imageUrl: null,
     priceCents: 1000,
     publisher: 'Someone',
+    publisherId: null,
     ...overrides,
   };
 }

@@ -9,13 +9,13 @@ import { api } from '@/api';
 
 import type { ImportOutcome } from '../../server/import-assets.ts';
 import type { AdminAsset } from '../../server/payloads.ts';
-import type { AssetInput } from '../../server/validate.ts';
+import type { MetadataPrefill } from '../../server/validate.ts';
 
 import brand from '../../brand.json';
 
 interface Draft {
   editing: AdminAsset | null;
-  metadata: AssetInput | null;
+  metadata: MetadataPrefill | null;
 }
 
 function SignIn({ onSignedIn }: { onSignedIn: () => void }) {

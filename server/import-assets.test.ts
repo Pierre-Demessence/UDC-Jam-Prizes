@@ -60,7 +60,7 @@ describe('importing several links', () => {
       name: 'Prize 111',
       asset_id: '111',
       category: 'tools',
-      price_cents: 3250,
+      price_cents: 6500,
     });
   });
 

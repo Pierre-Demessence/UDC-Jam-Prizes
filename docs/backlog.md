@@ -24,3 +24,7 @@ that completes it.
   different, private thing everywhere else; its filter would read better as "Publisher".
 
 ## Ideas
+
+- The metadata prefill and the attach action match an author by publisher name alone, though the store
+  id is now stored: a publisher who renames themselves stops being preselected even though their id
+  did not change (`server/repository.ts:171`).

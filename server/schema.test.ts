@@ -140,6 +140,20 @@ describe('the authors table', () => {
     expect(() => addAuthor({ discordHandle: 'someone-else', discordId: '123456789012345678' })).toThrow(/UNIQUE/i);
   });
 
+  it('refuses a second author on the same publisher id, but takes many with none', () => {
+    // The store id identifies a publisher the way the snowflake identifies a
+    // person, so a second author may not claim it.
+    addAuthor({ publisher: 'Febucci', publisherId: '45737' });
+
+    expect(() => addAuthor({ discordHandle: 'someone-else', publisherId: '45737' })).toThrow(/UNIQUE/i);
+
+    // Null is not a clash, so the idless authors the table already holds are fine.
+    addAuthor({ discordHandle: 'bob', publisherId: null });
+    addAuthor({ discordHandle: 'cleo', publisherId: null });
+
+    expect(handle.db.select().from(authors).all()).toHaveLength(3);
+  });
+
   it('accepts any number of authors with no publisher, which is not a clash', () => {
     addAuthor({ discordHandle: 'priya' });
     addAuthor({ discordHandle: 'bob' });
@@ -171,6 +185,7 @@ describe('the schema itself', () => {
       'assets_author_id_index',
       'authors_discord_handle_unique',
       'authors_discord_id_unique',
+      'authors_publisher_id_unique',
       'authors_publisher_unique',
       'keys_asset_id_index',
       'keys_key_fingerprint_unique',

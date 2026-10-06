@@ -3,6 +3,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { AuthorForm } from '@/admin/AuthorForm';
 import { Modal } from '@/admin/Modal';
 import { api } from '@/api';
+import { publisherPageUrl } from '@/format';
 
 import type { AdminAsset, AdminAuthor } from '../../server/payloads.ts';
 
@@ -21,6 +22,17 @@ const ATTACH_COLUMNS = 5;
 
 function prizeCount(count: number): string {
   return `${count} ${count === 1 ? 'prize' : 'prizes'}`;
+}
+
+/** The publisher name, linked to their store page when the id is known. */
+function PublisherCell({ author }: { author: AdminAuthor }) {
+  const storeUrl = publisherPageUrl(author.publisherId);
+  if (author.publisher === null)
+    return <span className="muted">unknown</span>;
+
+  return storeUrl === null
+    ? <>{author.publisher}</>
+    : <a href={storeUrl} rel="noreferrer" target="_blank">{author.publisher}</a>;
 }
 
 /**
@@ -171,7 +183,7 @@ export function AuthorsPanel({ onAssetsChanged, onClose, onNotice }: AuthorsPane
                       <Fragment key={author.id}>
                         <tr>
                           <th className="cell-name" scope="row">
-                            {author.publisher ?? <span className="muted">unknown</span>}
+                            <PublisherCell author={author} />
                           </th>
                           <td>{author.discordHandle ?? <span className="muted">—</span>}</td>
                           <td>{author.discordId ?? <span className="muted">—</span>}</td>

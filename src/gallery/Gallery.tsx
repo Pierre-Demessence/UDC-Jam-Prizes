@@ -5,12 +5,14 @@ import type { SortKey } from '@/catalogue';
 
 import { api } from '@/api';
 import { categoriesOf, DEFAULT_FILTERS, filterAssets, SORT_LABELS } from '@/catalogue';
-import { describeTotals, formatCategory, formatPrice, totalsTooltip } from '@/format';
+import { describeTotals, formatCategory, formatPrice, publisherPageUrl, totalsTooltip } from '@/format';
 
 import brand from '../../brand.json';
 
 function AssetCard({ asset }: { asset: Catalogue['assets'][number] }) {
   const category = formatCategory(asset.category);
+  const publisherLabel = asset.publisher ?? 'Unknown publisher';
+  const storeUrl = publisherPageUrl(asset.publisherId);
 
   return (
     <article className="card">
@@ -24,7 +26,9 @@ function AssetCard({ asset }: { asset: Catalogue['assets'][number] }) {
           <a href={asset.assetUrl} rel="noreferrer" target="_blank">{asset.name}</a>
         </h3>
         <p className="card-meta">
-          <span>{asset.publisher ?? 'Unknown publisher'}</span>
+          <span>
+            {storeUrl === null ? publisherLabel : <a href={storeUrl} rel="noreferrer" target="_blank">{publisherLabel}</a>}
+          </span>
           {category === null ? null : <span className="chip">{category}</span>}
         </p>
         <p className="card-price">{formatPrice(asset.priceCents)}</p>

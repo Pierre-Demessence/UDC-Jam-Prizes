@@ -13,7 +13,7 @@ const PAGE_URL = 'https://assetstore.unity.com/packages/tools/gui/text-animator-
 const fixture = readFileSync(new URL('./fixtures/asset-page.html', import.meta.url), 'utf8');
 
 // `id` and `name` first, then alphabetical: the house key order.
-const PUBLIC_FIELDS = ['id', 'name', 'assetId', 'assetUrl', 'category', 'imageUrl', 'priceCents', 'publisher'];
+const PUBLIC_FIELDS = ['id', 'name', 'assetId', 'assetUrl', 'category', 'imageUrl', 'priceCents', 'publisher', 'publisherId'];
 
 let handle: DatabaseHandle;
 let app: ReturnType<typeof createApp>;
@@ -178,7 +178,7 @@ describe('the admin gate', () => {
 });
 
 describe('the public catalogue', () => {
-  it('leaves a public visitor with the eight public fields and nothing else', async () => {
+  it('leaves a public visitor with the nine public fields and nothing else', async () => {
     const cookie = await signIn();
     await addAsset(cookie);
 
@@ -193,11 +193,23 @@ describe('the public catalogue', () => {
   it('sums the prices for the header', async () => {
     const cookie = await signIn();
     const asset = await addAsset(cookie);
-    expect(asset.priceCents).toBe(3250);
+    expect(asset.priceCents).toBe(6500);
 
     const body = await (await app.request('/api/assets')).json() as { totals: { count: number; priceCents: number } };
 
-    expect(body.totals).toEqual({ count: 1, priceCents: 3250 });
+    expect(body.totals).toEqual({ count: 1, priceCents: 6500 });
+  });
+
+  it('leaves an unattached prize named but unlinked', async () => {
+    const cookie = await signIn();
+    await addAsset(cookie);
+
+    const body = await (await app.request('/api/assets')).json() as { assets: { publisher: string | null; publisherId: string | null }[] };
+
+    // The id belongs to the author: a prize with no author keeps the name from
+    // the page and simply has no store link.
+    expect(body.assets[0].publisher).toBe('Febucci');
+    expect(body.assets[0].publisherId).toBeNull();
   });
 
   it('counts an asset with no price in the total only by its own count', async () => {
@@ -222,7 +234,7 @@ describe('the metadata endpoint', () => {
 
     expect(response.status).toBe(200);
     expect(body.existingAsset).toBeNull();
-    expect(body.metadata).toMatchObject({ name: expect.stringContaining('Text Animator'), assetId: '341308', priceCents: 3250 });
+    expect(body.metadata).toMatchObject({ name: expect.stringContaining('Text Animator'), assetId: '341308', priceCents: 6500, publisherId: '45737' });
   });
 
   it('warns when the asset is already in the list', async () => {
@@ -502,6 +514,42 @@ describe('the authors behind the prizes', () => {
     expect(await id.json()).toHaveProperty('error', expect.stringContaining('id'));
   });
 
+  it('refuses a publisher id that is not the number in the store address', async () => {
+    const cookie = await signIn();
+    const response = await app.request('/api/admin/authors', json({
+      publisher: 'Febucci',
+      publisherId: 'https://assetstore.unity.com/publishers/45737',
+    }, cookie));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toHaveProperty('error', expect.stringContaining('like 45737'));
+  });
+
+  it('refuses a store publisher id another author already holds', async () => {
+    const cookie = await signIn();
+    await addAuthor(cookie, { publisher: 'Febucci', publisherId: '45737' });
+
+    const response = await app.request('/api/admin/authors', json({ discordHandle: 'someone-else', publisherId: '45737' }, cookie));
+
+    // A readable 409, not the driver's error surfacing as a 500.
+    expect(response.status).toBe(409);
+    expect(await response.json()).toHaveProperty('error', expect.stringContaining('store publisher id'));
+  });
+
+  it('lets an author keep its own publisher id when it is edited', async () => {
+    const cookie = await signIn();
+    const author = await addAuthor(cookie, { publisher: 'Febucci', publisherId: '45737' });
+
+    const response = await app.request(`/api/admin/authors/${author.id}`, {
+      body: JSON.stringify({ publisher: 'Febucci', publisherId: '45737' }),
+      headers: { 'content-type': 'application/json', cookie },
+      method: 'PATCH',
+    });
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toHaveProperty('author.publisherId', '45737');
+  });
+
   it('preselects the author a page belongs to, by its publisher', async () => {
     const cookie = await signIn();
     const page = await addAsset(cookie);
@@ -511,6 +559,23 @@ describe('the authors behind the prizes', () => {
     const body = await lookup.json() as { metadata: { authorId: number | null } };
 
     expect(body.metadata.authorId).toBe(author.id);
+  });
+
+  it('keeps the publisher id on the author and serves it with their prizes', async () => {
+    const cookie = await signIn();
+    const author = await addAuthor(cookie, { publisherId: '45737' });
+    const page = await addAsset(cookie);
+    await app.request(`/api/admin/assets/${page.id}`, {
+      body: JSON.stringify({ ...page, authorId: author.id }),
+      headers: { 'content-type': 'application/json', cookie },
+      method: 'PATCH',
+    });
+
+    const catalogue = await (await app.request('/api/assets')).json() as { assets: { publisherId: string | null }[] };
+
+    // Stored on the author, joined onto the prize for the public page.
+    expect(author.publisherId).toBe('45737');
+    expect(catalogue.assets[0].publisherId).toBe('45737');
   });
 
   it('attaches every prize published under a publisher in one action', async () => {

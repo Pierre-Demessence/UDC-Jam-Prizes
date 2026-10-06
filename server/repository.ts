@@ -41,7 +41,15 @@ export function publicCatalogue(db: Db): PublicCatalogue {
   // Hidden prizes are left out entirely, totals included: the public page is the
   // catalogue, and a prize taken off it is not part of the sum any more.
   const visible = eq(assets.hidden, false);
-  const rows = db.select().from(assets).where(visible).orderBy(asc(assets.name)).all();
+  // The publisher id comes from the author, its only home; a LEFT JOIN keeps a
+  // prize with no author in the catalogue, it simply has no link.
+  const rows = db
+    .select({ asset: assets, publisherId: authors.publisherId })
+    .from(assets)
+    .leftJoin(authors, eq(assets.authorId, authors.id))
+    .where(visible)
+    .orderBy(asc(assets.name))
+    .all();
   const totals = db
     .select({
       count: sql<number>`count(*)`,
@@ -52,7 +60,7 @@ export function publicCatalogue(db: Db): PublicCatalogue {
     .get();
 
   return {
-    assets: rows.map(toPublicAsset),
+    assets: rows.map(row => toPublicAsset(row.asset, row.publisherId)),
     totals: { count: totals?.count ?? 0, priceCents: totals?.priceCents ?? 0 },
   };
 }
@@ -174,6 +182,11 @@ export function findAuthorByDiscordHandle(db: Db, handle: string): Author | null
 
 export function findAuthorByDiscordId(db: Db, discordId: string): Author | null {
   return db.select().from(authors).where(eq(authors.discordId, discordId)).get() ?? null;
+}
+
+/** The author who already holds a store publisher id, which is unique like the name. */
+export function findAuthorByPublisherId(db: Db, publisherId: string): Author | null {
+  return db.select().from(authors).where(eq(authors.publisherId, publisherId)).get() ?? null;
 }
 
 export function createAuthor(db: Db, input: AuthorInput): AdminAuthor {
