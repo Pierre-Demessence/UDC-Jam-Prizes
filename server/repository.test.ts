@@ -5,8 +5,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { DatabaseHandle } from './db.ts';
 
 import { connectDatabase } from './db.ts';
-import { adminAsset, attachAuthorByPublisher, createAttemptStore, createAuthor, deleteAuthor, encryptLegacyKeys, findAuthorByPublisher, listAuthors } from './repository.ts';
-import { assets, keys } from './schema.ts';
+import { adminAsset, attachAuthorByPublisher, createAttemptStore, createAuthor, deleteAuthor, encryptLegacyKeys, findAuthorById, findAuthorByPublisher, listAuthors, resolveAuthorId } from './repository.ts';
+import { assets, authors, keys } from './schema.ts';
 import { encryptSecret } from './secrets.ts';
 import { testConfig } from './testing.ts';
 
@@ -261,5 +261,54 @@ describe('the authors behind the prizes', () => {
     expect(labels.get(namedByPublisher.id)).toBe('Other Studio');
     // An id alone is a poor name, but it is what the record has.
     expect(labels.get(namedById.id)).toBe(`Author #${namedById.id}`);
+  });
+
+  it('makes the author of a page from its publisher name and id', () => {
+    const made = resolveAuthorId(handle.db, 'Febucci', '45737');
+    const created = handle.db.select().from(authors).where(eq(authors.id, made as number)).get();
+
+    // Nobody to contact yet: the store page names a publisher, not a person.
+    expect(created).toMatchObject({ discordHandle: null, discordId: null, publisher: 'Febucci', publisherId: '45737' });
+  });
+
+  it('finds the author that publisher already has, and fills in the id it lacked', () => {
+    const existing = addAuthor({ publisher: 'Febucci' });
+
+    expect(resolveAuthorId(handle.db, 'Febucci', '45737')).toBe(existing.id);
+    expect(handle.db.select().from(authors).all()).toHaveLength(1);
+    expect(findAuthorById(handle.db, existing.id)?.publisherId).toBe('45737');
+  });
+
+  it('leaves an id another author holds alone, and makes the record without it', () => {
+    // A rename leaves the old record holding the store id, so the record for the
+    // new name cannot take it; the name is what prizes match on.
+    addAuthor({ discordHandle: 'first', publisher: 'Old Studio', publisherId: '45737' });
+
+    const made = resolveAuthorId(handle.db, 'New Studio', '45737');
+
+    expect(findAuthorById(handle.db, made as number)?.publisherId).toBeNull();
+  });
+
+  it('has no author to resolve when the page names no publisher', () => {
+    expect(resolveAuthorId(handle.db, null, '45737')).toBeNull();
+    expect(resolveAuthorId(handle.db, '   ', '45737')).toBeNull();
+    expect(handle.db.select().from(authors).all()).toHaveLength(0);
+  });
+
+  it('keeps the id a record already has when the page reports another', () => {
+    const existing = addAuthor({ publisher: 'Febucci', publisherId: '45737' });
+
+    expect(resolveAuthorId(handle.db, 'Febucci', '99999')).toBe(existing.id);
+    expect(findAuthorById(handle.db, existing.id)?.publisherId).toBe('45737');
+  });
+
+  it('does not take an id from the author holding it', () => {
+    const holder = addAuthor({ discordHandle: 'first', discordId: null, publisher: 'Old Studio', publisherId: '45737' });
+    const renamed = addAuthor({ discordHandle: null, discordId: null, publisher: 'New Studio' });
+
+    resolveAuthorId(handle.db, 'New Studio', '45737');
+
+    expect(findAuthorById(handle.db, holder.id)?.publisherId).toBe('45737');
+    expect(findAuthorById(handle.db, renamed.id)?.publisherId).toBeNull();
   });
 });

@@ -6,6 +6,7 @@ import type { DatabaseHandle } from './db.ts';
 
 import { connectDatabase } from './db.ts';
 import { importAssets } from './import-assets.ts';
+import { createAuthor } from './repository.ts';
 import { testConfig } from './testing.ts';
 
 const fixture = readFileSync(new URL('./fixtures/asset-page.html', import.meta.url), 'utf8');
@@ -62,6 +63,33 @@ describe('importing several links', () => {
       category: 'tools',
       price_cents: 6500,
     });
+  });
+
+  it('makes the author the page names, and attaches the prize to it', async () => {
+    await importAssets(handle.db, pageFetcher, [url('111')], SECRET);
+
+    const author = handle.sqlite.prepare('select id, publisher, publisher_id from authors').get() as { id: number; publisher: string; publisher_id: string };
+    const row = handle.sqlite.prepare('select author_id from assets').get() as { author_id: number };
+
+    expect(author).toMatchObject({ publisher: 'Febucci', publisher_id: '45737' });
+    expect(row.author_id).toBe(author.id);
+  });
+
+  it('makes one author for a batch of prizes that share a publisher', async () => {
+    await importAssets(handle.db, pageFetcher, [url('111'), url('222'), url('333')], SECRET);
+
+    expect(handle.sqlite.prepare('select count(*) as n from authors').get()).toEqual({ n: 1 });
+    expect(handle.sqlite.prepare('select count(*) as n from assets where author_id is null').get()).toEqual({ n: 0 });
+  });
+
+  it('attaches to the author the list already has, and fills in the id they lacked', async () => {
+    const existing = createAuthor(handle.db, { discordHandle: 'priya', discordId: null, publisher: 'Febucci', publisherId: null });
+
+    await importAssets(handle.db, pageFetcher, [url('111')], SECRET);
+
+    expect(handle.sqlite.prepare('select count(*) as n from authors').get()).toEqual({ n: 1 });
+    expect(handle.sqlite.prepare('select author_id from assets').get()).toEqual({ author_id: existing.id });
+    expect(handle.sqlite.prepare('select publisher_id from authors').get()).toEqual({ publisher_id: '45737' });
   });
 
   it('counts a link it already has as a duplicate instead of adding it twice', async () => {

@@ -92,7 +92,13 @@ the socket address. Run typecheck, lint, test and build before considering work 
   `authors.publisher_id` is Unity's own id for that publisher, digits kept as text and unique like the
   name: the store link is built from it, and it is the only author column a public response carries —
   `publicCatalogue` LEFT JOINs `authors` for it, so a prize with no author keeps its name and simply
-  has no link. It is not a matching rule: the preselect and the attach action match on `publisher`.
+  has no link. It is not a matching rule: matching is by `publisher` in the preselect, in the find that
+  decides whether to create the record, and in the attach action alike.
+  An author is also made without the admin: reading a page whose publisher the list does not know
+  creates the record from the store name and id alone (`resolveAuthorId`, used by the metadata lookup
+  and the bulk import), leaving `discordHandle` and `discordId` null until someone fills them in. The
+  lookup comes first, which is what keeps a batch, or a second prize from the same publisher, to one
+  record.
 - Key values are ciphertext at rest (`server/secrets.ts`, AES-256-GCM, key from
   `KEY_ENCRYPTION_SECRET`): never write a key with a plain insert, and never compare `key_value` for
   duplicates — encryption is randomised. `keys.key_fingerprint` is what recognises a repeated key, and

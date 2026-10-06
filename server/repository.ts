@@ -202,6 +202,48 @@ export function updateAuthor(db: Db, id: number, input: AuthorInput): AdminAutho
 }
 
 /**
+ * The author behind a store publisher, created from the page the first time a
+ * prize from them is read.
+ *
+ * A publisher on an Asset Store page is an identity in itself — the name and the
+ * id both come from the store — so reading the prize is enough to have the
+ * record, and the admin adds the Discord handle whenever they learn it. The lookup
+ * comes first, so the second prize from the same publisher finds the first one's
+ * author rather than making a second.
+ *
+ * A matched record that was missing its id is filled in, since the page knows it
+ * and the store link is built from it; nothing else about the record changes. An id
+ * another author already holds is left where it is — after a rename the old record
+ * keeps the id while the store serves a new name, and the unique index would refuse
+ * the write. A record being created then goes without the id: the name is what
+ * prizes match on.
+ */
+export function resolveAuthorId(db: Db, publisher: string | null, publisherId: string | null): number | null {
+  const name = publisher?.trim() ?? '';
+  if (name === '')
+    return null;
+
+  const existing = findAuthorByPublisher(db, name);
+  if (existing === null) {
+    const idIsFree = publisherId !== null && findAuthorByPublisherId(db, publisherId) === null;
+
+    return createAuthor(db, {
+      discordHandle: null,
+      discordId: null,
+      publisher: name,
+      publisherId: idIsFree ? publisherId : null,
+    }).id;
+  }
+
+  if (publisherId === null || existing.publisherId !== null || findAuthorByPublisherId(db, publisherId) !== null)
+    return existing.id;
+
+  db.update(authors).set({ publisherId }).where(eq(authors.id, existing.id)).run();
+
+  return existing.id;
+}
+
+/**
  * Deletes an author and clears the link on their prizes — what `ON DELETE SET
  * NULL` does too, but doing it here is what lets the count come back for the
  * notice. Returns how many prizes were unlinked, or null when there is no such

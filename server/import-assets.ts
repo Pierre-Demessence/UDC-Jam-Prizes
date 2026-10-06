@@ -8,7 +8,7 @@
  */
 import type { DatabaseHandle } from './db.ts';
 
-import { createAsset, findAssetByAssetId, findAuthorByPublisher } from './repository.ts';
+import { createAsset, findAssetByAssetId, resolveAuthorId } from './repository.ts';
 import { assertAssetStoreUrl, fetchAssetPage } from './unity-fetch.ts';
 import { MetadataError, parseAssetPage } from './unity.ts';
 import { assetInputFromMetadata } from './validate.ts';
@@ -59,12 +59,15 @@ export async function importAssets(
         return { name: existing.name, message: 'Already in the list.', status: 'duplicate', url: url.href };
       }
 
-      // A known publisher means the prize lands already attached to its author,
-      // exactly as the single-asset form preselects one.
-      const author = findAuthorByPublisher(db, metadata.publisher);
+      // A publisher on the page is an identity of its own, so the prize lands
+      // attached: reading the first prize from an unknown publisher creates the
+      // author, and the rest of the batch find it again.
       const asset = createAsset(
         db,
-        { ...assetInputFromMetadata(metadata), authorId: author?.id ?? null },
+        {
+          ...assetInputFromMetadata(metadata),
+          authorId: resolveAuthorId(db, metadata.publisher, metadata.publisherId),
+        },
         keyEncryptionSecret,
       );
 

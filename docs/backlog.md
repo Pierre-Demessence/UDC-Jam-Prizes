@@ -19,7 +19,8 @@ that completes it.
   author is preselected, until the author list arrives (`src/admin/AssetForm.tsx`).
 - Publisher and handle matching folds case with SQLite's `lower()`, which only handles ASCII, while
   the JavaScript side uses `toLowerCase()`: a non-ASCII publisher or handle would not match
-  case-insensitively (`server/repository.ts`).
+  case-insensitively (`server/repository.ts`). Reading a page now creates the author, so a spelling
+  variance the matcher cannot fold makes a second record rather than merely missing the preselect.
 - The public gallery still labels its publisher sort "Author" (`src/catalogue.ts`), which now means a
   different, private thing everywhere else; its filter would read better as "Publisher".
 

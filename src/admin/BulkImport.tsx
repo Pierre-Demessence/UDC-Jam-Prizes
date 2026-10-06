@@ -49,7 +49,9 @@ export function BulkImport({ onClose, onDone }: {
       <h2>Paste several links</h2>
       <p className="hint">
         One Asset Store link per line, up to 20 at a time. Each page is read and the prize saved with
-        its name, publisher, category, price and image — edit any of them afterwards.
+        its name, publisher, category, price and image — edit any of them afterwards. A publisher the
+        list does not know yet becomes an author, so every prize arrives attached; add their Discord
+        handle in the Authors panel.
       </p>
 
       <label className="field field-wide">

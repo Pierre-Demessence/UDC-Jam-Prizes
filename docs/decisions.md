@@ -284,3 +284,24 @@ catalogue therefore LEFT JOINs `authors`, so a public response reads one column 
 the publisher id alone, the name it belongs to being public already. Rejected: **matching authors on
 the id as well**, which the id would allow; the name stays the only matching rule for now.
 
+## Reading a page creates the author it can name
+
+A Unity page names its publisher, and that name is the key a prize matches an author by, so the record
+can be made without the admin: `resolveAuthorId` finds the author for a publisher, makes one from the
+store name and id when there is none, and fills in an id an existing record was missing. Both scrape
+paths use it — the metadata lookup that prefills the prize form, and the bulk import — so a prize
+arrives attached instead of waiting for someone to type the publisher in again. The Discord handle and
+id stay null until the admin learns them: the panel is still where a store name becomes a person.
+
+Rejected: **creating the author only when the prize is saved.** That keeps the metadata lookup a pure
+read, but the form then shows "no author attached" for a prize that is about to get one, and the batch
+path would need the rule written a second time.
+
+Rejected: **leaving creation to the admin**, which is what the list did. Reading twenty links from ten
+publishers then meant ten typing stops for information the pages had already given.
+
+The lookup comes first — one synchronous call, with no await between the find and the insert — so a
+batch, or a second prize from the same publisher, resolves to one record. An id another author already
+holds is left where it is and the new record goes without it: a rename leaves the old record keeping
+the id while the store serves a new name, and the unique index refuses a second holder.
+

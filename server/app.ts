@@ -41,6 +41,7 @@ import {
   findAuthorByPublisherId,
   listAuthors,
   publicCatalogue,
+  resolveAuthorId,
   updateAsset,
   updateAuthor,
   updateHidden,
@@ -269,7 +270,10 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
   // Public. The payload is shaped field by field, so private columns cannot leak.
   app.get('/api/assets', c => c.json(publicCatalogue(db)));
 
-  /** Reads a Unity page and returns the fields it offers, for the admin to confirm. */
+  /**
+   * Reads a Unity page, returns the fields it offers for the admin to confirm, and
+   * makes an author out of the publisher the page names when the list has none.
+   */
   app.post('/api/metadata', async (c) => {
     const denied = requireAdmin(c);
     if (denied)
@@ -285,14 +289,15 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
       const html = await fetchAssetPage(url, fetchImpl === undefined ? {} : { fetchImpl });
       const metadata = parseAssetPage(html, url.href);
       const existing = findAssetByAssetId(db, metadata.assetId);
-      // The publisher is what ties a prize to its author, so a known one is
-      // preselected: reading a batch from a dozen authors is then no typing.
-      const author = findAuthorByPublisher(db, metadata.publisher);
+      // The page's own publisher is enough to have an author: one is created when
+      // the list does not know that publisher yet, and the next prize from them
+      // finds it instead of making a second.
+      const authorId = resolveAuthorId(db, metadata.publisher, metadata.publisherId);
       // The publisher id rides along with the prefill so the form can hand it to
       // the author it creates; it is not a column of the prize.
       const prefill: MetadataPrefill = {
         ...assetInputFromMetadata(metadata),
-        authorId: author?.id ?? null,
+        authorId,
         publisherId: metadata.publisherId,
       };
 

@@ -49,21 +49,22 @@ client and the API, which is what a deployment would run.
   line. No login, and no private field is ever sent to the browser.
 - **Admin** (`/admin`) — sign in with `ADMIN_PASSWORD`, paste an Asset Store URL and have the name,
   image, publisher and their store page id, category, price and the asset's Unity id filled in from the
-  page, attach the author, and keep
-  internal notes; paste the keys the author sends — the count is what the row reports, and the *Needed*
-  field says how many you asked for.
+  page. The publisher becomes an author — created from the page when the list does not know it — so the
+  prize arrives attached; keep internal notes, and paste the keys the author sends — the count is what
+  the row reports, and the *Needed* field says how many you asked for.
   Authors are a list of their own (*Authors* in the toolbar): one record per person with their store
   publisher and its id, Discord handle and Discord id, shared by every prize they donated, shown by their handle
   and by their publisher when the handle is not known yet. A prize whose publisher already belongs to
-  an author picks it up by itself, and *Attach every matching prize* links a whole back catalogue in
-  one click.
+  an author picks it up by itself, *Attach every matching prize* links a whole back catalogue in one
+  click, and a publisher nobody has yet gains their record by being read.
   The prize list is a table — every column sorts, and each row opens its own keys. Type how
   many keys a prize needs and the row says whether they have arrived: plain when nothing was asked for,
   marked up while the request is unfilled, and marked up differently once it is filled.
   Hiding a prize takes it off the public page — its keys and author stay here — and the same button
   shows it again.
   *Paste several links* adds a whole batch at once (up to 20, read a few at a time), reporting per
-  link whether it was added, already there, or unreadable. Key values are encrypted on the way in and
+  link whether it was added, already there, or unreadable; the batch makes and reuses authors the same
+  way. Key values are encrypted on the way in and
   decrypted for the admin screen only; they never leave the server in a public response.
 - The price is an ordinary field: read from the page when it offers one, editable, and allowed to stay
   empty when the page has none. A sale price is not what a prize is worth, so the page's list price is

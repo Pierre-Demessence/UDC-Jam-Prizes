@@ -202,7 +202,13 @@ describe('the public catalogue', () => {
 
   it('leaves an unattached prize named but unlinked', async () => {
     const cookie = await signIn();
-    await addAsset(cookie);
+    // Entered by hand: the metadata read is what would have made the author.
+    await app.request('/api/admin/assets', json({
+      name: 'A Prize',
+      assetId: '169047',
+      assetUrl: 'https://assetstore.unity.com/packages/2d/a-prize-169047',
+      publisher: 'Febucci',
+    }, cookie));
 
     const body = await (await app.request('/api/assets')).json() as { assets: { publisher: string | null; publisherId: string | null }[] };
 
@@ -550,26 +556,39 @@ describe('the authors behind the prizes', () => {
     expect(await response.json()).toHaveProperty('author.publisherId', '45737');
   });
 
-  it('preselects the author a page belongs to, by its publisher', async () => {
+  it('makes the author of a page whose publisher the list does not know', async () => {
     const cookie = await signIn();
-    const page = await addAsset(cookie);
-    const author = await addAuthor(cookie, { publisher: page.publisher });
 
     const lookup = await app.request('/api/metadata', json({ url: PAGE_URL }, cookie));
     const body = await lookup.json() as { metadata: { authorId: number | null } };
+    const authors = await (await app.request('/api/admin/authors', { headers: { cookie } }))
+      .json() as { authors: { id: number; publisher: string | null; publisherId: string | null }[] };
 
+    expect(authors.authors).toHaveLength(1);
+    expect(authors.authors[0]).toMatchObject({ publisher: 'Febucci', publisherId: '45737' });
+    expect(body.metadata.authorId).toBe(authors.authors[0].id);
+  });
+
+  it('preselects the author a page belongs to, and fills in the id they lacked', async () => {
+    const cookie = await signIn();
+    const author = await addAuthor(cookie, { publisher: 'Febucci' });
+
+    const lookup = await app.request('/api/metadata', json({ url: PAGE_URL }, cookie));
+    const body = await lookup.json() as { metadata: { authorId: number | null } };
+    const authors = await (await app.request('/api/admin/authors', { headers: { cookie } }))
+      .json() as { authors: { id: number; publisherId: string | null }[] };
+
+    // Found by name rather than made again, and the store id the page knows is
+    // filled in on the record, which is what its link needs.
     expect(body.metadata.authorId).toBe(author.id);
+    expect(authors.authors).toHaveLength(1);
+    expect(authors.authors[0].publisherId).toBe('45737');
   });
 
   it('keeps the publisher id on the author and serves it with their prizes', async () => {
     const cookie = await signIn();
-    const author = await addAuthor(cookie, { publisherId: '45737' });
-    const page = await addAsset(cookie);
-    await app.request(`/api/admin/assets/${page.id}`, {
-      body: JSON.stringify({ ...page, authorId: author.id }),
-      headers: { 'content-type': 'application/json', cookie },
-      method: 'PATCH',
-    });
+    const author = await addAuthor(cookie, { publisher: 'Febucci', publisherId: '45737' });
+    await addAsset(cookie);
 
     const catalogue = await (await app.request('/api/assets')).json() as { assets: { publisherId: string | null }[] };
 
@@ -580,15 +599,22 @@ describe('the authors behind the prizes', () => {
 
   it('attaches every prize published under a publisher in one action', async () => {
     const cookie = await signIn();
-    const page = await addAsset(cookie);
-    const author = await addAuthor(cookie, { publisher: page.publisher });
+    // Created by hand: a prize from before its author's record existed, which is
+    // what the attach action is for.
+    const created = await (await app.request('/api/admin/assets', json({
+      name: 'A Prize',
+      assetId: '169047',
+      assetUrl: 'https://assetstore.unity.com/packages/2d/a-prize-169047',
+      publisher: 'Febucci',
+    }, cookie))).json() as { asset: { id: number } };
+    const author = await addAuthor(cookie, { publisher: 'Febucci' });
 
-    const attached = await app.request(`/api/admin/authors/${author.id}/attach`, json({ publisher: page.publisher }, cookie));
+    const attached = await app.request(`/api/admin/authors/${author.id}/attach`, json({ publisher: 'Febucci' }, cookie));
     const body = await attached.json() as { assets: { author: { id: number } | null; id: number }[]; attached: number };
     const missed = await app.request(`/api/admin/authors/${author.id}/attach`, json({ publisher: 'Nobody at all' }, cookie));
 
     expect(body.attached).toBe(1);
-    expect(body.assets.find(row => row.id === page.id)?.author?.id).toBe(author.id);
+    expect(body.assets.find(row => row.id === created.asset.id)?.author?.id).toBe(author.id);
     expect((await missed.json() as { attached: number }).attached).toBe(0);
   });
 

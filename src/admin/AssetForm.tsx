@@ -96,7 +96,14 @@ export function AssetForm({ editing, metadata, onSaved }: AssetFormProps) {
       setPrice(toPriceInput(lookup.metadata.priceCents));
       setUrl(lookup.metadata.assetUrl);
 
-      const matched = lookup.metadata.authorId === null ? '' : ' The publisher matched an author, already chosen below.';
+      // Reading a page can create the author the server built from its publisher,
+      // so the list this form loaded at mount may not hold it yet.
+      if (lookup.metadata.authorId !== null && !authors.some(author => author.id === lookup.metadata.authorId)) {
+        const fresh = await api.authors();
+        setAuthors(fresh.authors);
+      }
+
+      const matched = lookup.metadata.authorId === null ? '' : ' Its publisher is set as the author below.';
       setMessage(lookup.existingAsset === null
         ? `Read the page. Check the fields, then save.${matched}`
         : `Careful: "${lookup.existingAsset.name}" is already in the list with the same Unity id.`);
@@ -210,7 +217,9 @@ export function AssetForm({ editing, metadata, onSaved }: AssetFormProps) {
                     onClick={() => setChoosingAuthor(current => !current)}
                     type="button"
                   >
-                    {choosingAuthor ? 'Cancel the new author' : 'New author'}
+                    {choosingAuthor
+                      ? (attached === null ? 'Cancel the new author' : 'Cancel the edit')
+                      : (attached === null ? 'New author' : 'Edit this author')}
                   </button>
                 </div>
                 <span className="hint">
@@ -224,9 +233,15 @@ export function AssetForm({ editing, metadata, onSaved }: AssetFormProps) {
                 ? (
                     <div className="field-wide">
                       <AuthorForm
-                        editing={null}
+                        editing={attached}
+                        // Remounts when the choice changes, so the fields show the
+                        // author the select points at rather than the one before.
+                        key={attached?.id ?? 'new'}
                         onSaved={(author) => {
-                          setAuthors(current => [...current, author].sort((left, right) => left.label.localeCompare(right.label)));
+                          // Editing the attached author replaces it in the list; a new
+                          // one is appended and becomes this prize's author.
+                          setAuthors(current => [...current.filter(row => row.id !== author.id), author]
+                            .sort((left, right) => left.label.localeCompare(right.label)));
                           update('authorId', author.id);
                           setChoosingAuthor(false);
                         }}
