@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
-import { DEFAULT_SORT, keyNeed, keySummary, needClass, needLabel, nextSort, sortAssets } from '@/admin/asset-table';
+import { authorSummary, DEFAULT_SORT, keyNeed, keySummary, needClass, needLabel, nextSort, sortAssets } from '@/admin/asset-table';
 
-import type { AdminAsset } from '../../server/payloads.ts';
+import type { AdminAsset, AdminAuthor } from '../../server/payloads.ts';
 
 function asset(overrides: Partial<AdminAsset> & { name: string }): AdminAsset {
   return {
     id: 1,
     assetId: overrides.name,
     assetUrl: 'https://assetstore.unity.com/packages/tools/a-prize-1',
+    author: null,
     category: null,
-    contact: null,
     createdAt: '2024-01-01T00:00:00.000Z',
     hidden: false,
     imageUrl: null,
@@ -24,6 +24,19 @@ function asset(overrides: Partial<AdminAsset> & { name: string }): AdminAsset {
   };
 }
 
+function author(overrides: Partial<AdminAuthor> & { label: string }): AdminAuthor {
+  const defaults: AdminAuthor = {
+    id: 1,
+    assetCount: 1,
+    discordHandle: null,
+    discordId: null,
+    label: overrides.label,
+    publisher: null,
+  };
+
+  return { ...defaults, ...overrides };
+}
+
 /** n stored keys: a key holds nothing but its value. */
 function stored(count: number): AdminAsset['keys'] {
   return Array.from({ length: count }, (_, index) => ({ id: index + 1, keyValue: `KEY-${index + 1}` }));
@@ -32,7 +45,7 @@ function stored(count: number): AdminAsset['keys'] {
 const prizes: AdminAsset[] = [
   asset({ id: 1, name: 'Bee UI', category: 'tools/gui', keys: stored(2), priceCents: 2000, publisher: 'Febucci' }),
   asset({ id: 2, name: 'Mountain Lake', category: '3d/environments/landscapes', keys: stored(1), priceCents: 5999, publisher: 'VIVID Arts' }),
-  asset({ id: 3, name: 'Apple Kit', category: 'tools/gui', contact: { contactNotes: null, discordHandle: 'priya' }, keys: stored(3), priceCents: 100, publisher: 'Someone' }),
+  asset({ id: 3, name: 'Apple Kit', author: author({ id: 7, discordHandle: 'priya', label: 'Priya', publisher: 'Someone' }), category: 'tools/gui', keys: stored(3), priceCents: 100, publisher: 'Someone' }),
   asset({ id: 4, name: 'Zebra Kit', category: null, keys: [], priceCents: null, publisher: null }),
 ];
 
@@ -44,11 +57,11 @@ describe('sortAssets', () => {
     expect(names(sortAssets(prizes, { direction: 'descending', key: 'name' }))).toEqual(['Zebra Kit', 'Mountain Lake', 'Bee UI', 'Apple Kit']);
   });
 
-  it('sorts by author, leaving an unknown author last in either direction', () => {
-    expect(names(sortAssets(prizes, { direction: 'ascending', key: 'author' })))
+  it('sorts by publisher, leaving an unknown publisher last in either direction', () => {
+    expect(names(sortAssets(prizes, { direction: 'ascending', key: 'publisher' })))
       .toEqual(['Bee UI', 'Apple Kit', 'Mountain Lake', 'Zebra Kit']);
     // Two prizes by the same author keep the name order, the same way the public gallery does.
-    expect(names(sortAssets(prizes, { direction: 'descending', key: 'author' })))
+    expect(names(sortAssets(prizes, { direction: 'descending', key: 'publisher' })))
       .toEqual(['Mountain Lake', 'Apple Kit', 'Bee UI', 'Zebra Kit']);
   });
 
@@ -71,10 +84,10 @@ describe('sortAssets', () => {
       .toEqual(['Apple Kit', 'Bee UI', 'Mountain Lake', 'Zebra Kit']);
   });
 
-  it('sorts by contact, leaving a prize with no contact last in either direction', () => {
-    expect(names(sortAssets(prizes, { direction: 'ascending', key: 'contact' })))
+  it('sorts by author, leaving a prize with no author last in either direction', () => {
+    expect(names(sortAssets(prizes, { direction: 'ascending', key: 'author' })))
       .toEqual(['Apple Kit', 'Bee UI', 'Mountain Lake', 'Zebra Kit']);
-    expect(names(sortAssets(prizes, { direction: 'descending', key: 'contact' })))
+    expect(names(sortAssets(prizes, { direction: 'descending', key: 'author' })))
       .toEqual(['Apple Kit', 'Bee UI', 'Mountain Lake', 'Zebra Kit']);
   });
 
@@ -85,7 +98,7 @@ describe('sortAssets', () => {
     ];
 
     expect(names(sortAssets(sameEverything, { direction: 'ascending', key: 'price' }))).toEqual(['First', 'Second']);
-    expect(names(sortAssets(sameEverything, { direction: 'ascending', key: 'author' }))).toEqual(['First', 'Second']);
+    expect(names(sortAssets(sameEverything, { direction: 'ascending', key: 'publisher' }))).toEqual(['First', 'Second']);
     // A tie stays A to Z even when the column itself runs the other way.
     expect(names(sortAssets(sameEverything, { direction: 'descending', key: 'price' }))).toEqual(['First', 'Second']);
   });
@@ -95,6 +108,18 @@ describe('sortAssets', () => {
     sortAssets(input, { direction: 'descending', key: 'keys' });
 
     expect(names(input)).toEqual(['Bee UI', 'Mountain Lake', 'Apple Kit', 'Zebra Kit']);
+  });
+});
+
+describe('authorSummary', () => {
+  it('names the fields the label does not already show', () => {
+    expect(authorSummary(author({ discordHandle: 'priya', discordId: '123456789012345678', label: 'priya', publisher: 'VIVID Arts' })))
+      .toBe('Private: the author record never reaches the public list. VIVID Arts · 123456789012345678');
+  });
+
+  it('does not repeat the label back to the reader', () => {
+    expect(authorSummary(author({ label: 'VIVID Arts', publisher: 'VIVID Arts' })))
+      .toBe('Private: the author record never reaches the public list.');
   });
 });
 

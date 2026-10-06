@@ -8,7 +8,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { DatabaseHandle } from './db.ts';
 
 import { connectDatabase } from './db.ts';
-import { assets, contacts, keys } from './schema.ts';
+import { assets, authors, keys } from './schema.ts';
 
 let handle: DatabaseHandle;
 
@@ -49,6 +49,10 @@ function addAsset(overrides: Partial<typeof assets.$inferInsert> = {}) {
     .get();
 }
 
+function addAuthor(overrides: Partial<typeof authors.$inferInsert> = {}) {
+  return handle.db.insert(authors).values({ discordHandle: 'priya', ...overrides }).returning().get();
+}
+
 describe('the assets table', () => {
   it('stores an asset with both clients and sensible defaults', () => {
     const asset = addAsset();
@@ -74,14 +78,12 @@ describe('the assets table', () => {
 });
 
 describe('the private tables', () => {
-  it('deletes an asset\'s contacts and keys along with the asset', () => {
+  it('deletes an asset\'s keys along with the asset', () => {
     const asset = addAsset();
-    handle.db.insert(contacts).values({ assetId: asset.id, discordHandle: 'some_author' }).run();
     handle.db.insert(keys).values({ assetId: asset.id, keyValue: 'ABCD-1234-EFGH' }).run();
 
     handle.db.delete(assets).where(eq(assets.id, asset.id)).run();
 
-    expect(handle.db.select().from(contacts).all()).toHaveLength(0);
     expect(handle.db.select().from(keys).all()).toHaveLength(0);
   });
 
@@ -114,6 +116,38 @@ describe('the private tables', () => {
   });
 });
 
+describe('the authors table', () => {
+  it('links a prize to its author and unlinks it when the author goes', () => {
+    const author = addAuthor();
+    const prize = addAsset({ authorId: author.id });
+
+    expect(prize.authorId).toBe(author.id);
+
+    handle.db.delete(authors).where(eq(authors.id, author.id)).run();
+
+    // The prize survives: `SET NULL`, never a cascade in this direction.
+    expect(handle.db.select().from(assets).where(eq(assets.id, prize.id)).get()?.authorId).toBeNull();
+  });
+
+  it('refuses a prize pointing at an author that does not exist', () => {
+    expect(() => addAsset({ authorId: 999 })).toThrow(/FOREIGN KEY/i);
+  });
+
+  it('refuses a second author on the same publisher, or the same Discord id', () => {
+    addAuthor({ discordId: '123456789012345678', publisher: 'ashkatchap' });
+
+    expect(() => addAuthor({ discordHandle: 'someone-else', publisher: 'ashkatchap' })).toThrow(/UNIQUE/i);
+    expect(() => addAuthor({ discordHandle: 'someone-else', discordId: '123456789012345678' })).toThrow(/UNIQUE/i);
+  });
+
+  it('accepts any number of authors with no publisher, which is not a clash', () => {
+    addAuthor({ discordHandle: 'priya' });
+    addAuthor({ discordHandle: 'bob' });
+
+    expect(handle.db.select().from(authors).all()).toHaveLength(2);
+  });
+});
+
 describe('the schema itself', () => {
   it('refreshes updated_at when an asset is updated', () => {
     const created = new Date('2020-01-01T00:00:00Z');
@@ -134,7 +168,10 @@ describe('the schema itself', () => {
   it('carries the uniqueness and foreign-key indexes', () => {
     expect(indexNames(handle)).toEqual(expect.arrayContaining([
       'assets_asset_id_unique',
-      'contacts_asset_id_index',
+      'assets_author_id_index',
+      'authors_discord_handle_unique',
+      'authors_discord_id_unique',
+      'authors_publisher_unique',
       'keys_asset_id_index',
       'keys_key_fingerprint_unique',
     ]));

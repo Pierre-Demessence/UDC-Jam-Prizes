@@ -173,8 +173,8 @@ passphrase-derived key entered at start-up (the server would sit waiting for a h
 ## The admin list is a table, sorted by hand
 
 The admin is a tool, not a shop window: one row per prize and one column per fact rather than a card per
-prize, which hid the columns that could be compared. Keys and the author's contact stay behind a row's
-own panel instead of in a cell.
+prize, which hid the columns that could be compared. Keys stay behind a row's own panel instead of in a
+cell, while the author is a column of its own.
 
 Sorting is one comparator per column (`src/admin/asset-table.ts`), matching the public gallery: a
 missing value sorts last in **both** directions, because an unpriced asset is not "the cheapest", and a
@@ -182,6 +182,35 @@ tie breaks on the name. The column shows a ▲/▼ glyph and carries `aria-sort`
 colour alone.
 
 Rejected: a table library, a dependency for what one comparator per column does.
+
+## The author is an entity, not a column on the prize
+
+A prize's donor lives in `authors`, one record per person, and `assets.author_id` points at it. The
+catalogue comes from a dozen people for sixty-odd prizes, so a handle copied onto every row was the
+same fact repeated, and it made two prizes by one person impossible to see as one. The author also
+carries `discord_id` beside the handle: the handle is a mutable display name and the id is the
+snowflake that never changes, so a rename would otherwise split one person into two records.
+
+`authors.publisher` is the store publisher string, unique among authors and matched
+case-insensitively. It is what makes the record pay off: reading a page, importing a batch or pressing
+*Attach every matching prize* finds the author unasked, and a preselect is only trustworthy if a
+publisher can mean one person — so the second author claiming one is refused with a sentence rather
+than making the match quietly ambiguous.
+
+The link is `ON DELETE SET NULL`, the opposite of the cascade `contacts` had from the asset: deleting
+an author leaves every prize, key and price in place, unattached.
+
+An author carries no name of its own: it is labelled by the Discord handle, falling back to the store
+publisher, so the label cannot drift from either and there is no field to fill twice. At least one of
+publisher / handle / id is required, because a record with none of them could not be found again or
+told apart from the next one. Nothing else lives on the record: a free-text note belongs on the prize
+(`assets.notes`) or nowhere, and the contact notes the author inherited were per prize to begin with.
+
+Rejected: keeping the per-prize `contacts` row (the duplication this fixes, and no way to treat a
+repeated donor as one person); identifying an author by the handle alone (a rename orphans their
+prizes); a stored free-text name (a third label to keep in step with the handle and the publisher),
+and with it a free-text name and no publisher link at all (sixty prizes would still need sixty manual
+picks, and nothing could be preselected).
 
 ## A key is just stock
 

@@ -7,6 +7,7 @@ import process from 'node:process';
 
 import type { Config } from './config.ts';
 import type { DatabaseHandle } from './db.ts';
+import type { AuthorInput } from './validate.ts';
 
 import {
   createRateLimiter,
@@ -20,18 +21,27 @@ import {
 } from './auth.ts';
 import { importAssets } from './import-assets.ts';
 import { addressMatches, isLoopback, normalizeAddress } from './ip-filter.ts';
+import { authorLabel } from './payloads.ts';
 import {
   addKeys,
   adminAsset,
   adminCatalogue,
+  attachAuthorByPublisher,
   createAsset,
   createAttemptStore,
+  createAuthor,
   deleteAsset,
+  deleteAuthor,
   deleteKey,
   findAssetByAssetId,
+  findAuthorByDiscordHandle,
+  findAuthorByDiscordId,
+  findAuthorById,
+  findAuthorByPublisher,
+  listAuthors,
   publicCatalogue,
-  saveContact,
   updateAsset,
+  updateAuthor,
   updateHidden,
   updateNeeded,
 } from './repository.ts';
@@ -40,7 +50,7 @@ import { MetadataError, parseAssetPage } from './unity.ts';
 import {
   assetInputFromMetadata,
   parseAssetInput,
-  parseContactInput,
+  parseAuthorInput,
   parseHiddenInput,
   parseId,
   parseKeyValues,
@@ -69,6 +79,33 @@ async function readJson(c: Context): Promise<Record<string, unknown> | null> {
   catch {
     return null;
   }
+}
+
+/**
+ * The first field another author already holds, as a sentence the admin can act
+ * on. `ignoreId` lets an update keep its own values; the reasons differ because
+ * the fix does.
+ */
+function authorClash(db: DatabaseHandle['db'], input: AuthorInput, ignoreId?: number): string | null {
+  if (input.publisher !== null) {
+    const taken = findAuthorByPublisher(db, input.publisher);
+    if (taken !== null && taken.id !== ignoreId)
+      return `"${authorLabel(taken)}" already publishes as ${input.publisher}. One author per publisher is what lets a prize find its author on its own.`;
+  }
+
+  if (input.discordHandle !== null) {
+    const taken = findAuthorByDiscordHandle(db, input.discordHandle);
+    if (taken !== null && taken.id !== ignoreId)
+      return `That Discord handle already belongs to "${authorLabel(taken)}".`;
+  }
+
+  if (input.discordId !== null) {
+    const taken = findAuthorByDiscordId(db, input.discordId);
+    if (taken !== null && taken.id !== ignoreId)
+      return `That Discord id already belongs to "${authorLabel(taken)}".`;
+  }
+
+  return null;
 }
 
 /**
@@ -241,10 +278,13 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
       const html = await fetchAssetPage(url, fetchImpl === undefined ? {} : { fetchImpl });
       const metadata = parseAssetPage(html, url.href);
       const existing = findAssetByAssetId(db, metadata.assetId);
+      // The publisher is what ties a prize to its author, so a known one is
+      // preselected: reading a batch from a dozen authors is then no typing.
+      const author = findAuthorByPublisher(db, metadata.publisher);
 
       return c.json({
         existingAsset: existing === null ? null : { id: existing.id, name: existing.name },
-        metadata: assetInputFromMetadata(metadata),
+        metadata: { ...assetInputFromMetadata(metadata), authorId: author?.id ?? null },
       });
     }
     catch (cause) {
@@ -290,6 +330,9 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
     if (findAssetByAssetId(db, input.value.assetId) !== null)
       return c.json({ error: 'That asset is already in the list.' }, 409);
 
+    if (input.value.authorId !== null && findAuthorById(db, input.value.authorId) === null)
+      return c.json({ error: 'That author is no longer in the list.' }, 400);
+
     return c.json({ asset: createAsset(db, input.value, keyEncryptionSecret) }, 201);
   });
 
@@ -309,6 +352,9 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
     const clash = findAssetByAssetId(db, input.value.assetId);
     if (clash !== null && clash.id !== id)
       return c.json({ error: 'Another prize already uses that Unity id.' }, 409);
+
+    if (input.value.authorId !== null && findAuthorById(db, input.value.authorId) === null)
+      return c.json({ error: 'That author is no longer in the list.' }, 400);
 
     const asset = updateAsset(db, id, input.value, keyEncryptionSecret);
     return asset === null ? c.json({ error: 'Unknown asset.' }, 404) : c.json({ asset });
@@ -364,24 +410,6 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
     return asset === null ? c.json({ error: 'Unknown asset.' }, 404) : c.json({ asset });
   });
 
-  app.put('/api/admin/assets/:id/contact', async (c) => {
-    const denied = requireAdmin(c);
-    if (denied)
-      return denied;
-
-    const id = parseId(c.req.param('id'));
-    const asset = id === null ? null : adminAsset(db, id, keyEncryptionSecret);
-    if (id === null || asset === null)
-      return c.json({ error: 'Unknown asset.' }, 404);
-
-    const input = parseContactInput(await readJson(c));
-    if (!input.ok)
-      return c.json({ error: input.error }, 400);
-
-    saveContact(db, id, input.value);
-    return c.json({ asset: adminAsset(db, id, keyEncryptionSecret) });
-  });
-
   app.post('/api/admin/assets/:id/keys', async (c) => {
     const denied = requireAdmin(c);
     if (denied)
@@ -416,6 +444,83 @@ export function createApp({ config, fetchImpl, handle }: AppOptions) {
       return c.json({ error: 'Unknown key.' }, 404);
 
     return c.json({ asset: deleteKey(db, id, keyId, keyEncryptionSecret) });
+  });
+
+  /** All of them, each with the prize count the author panel shows. */
+  app.get('/api/admin/authors', (c) => {
+    const denied = requireAdmin(c);
+    return denied ?? c.json({ authors: listAuthors(db) });
+  });
+
+  app.post('/api/admin/authors', async (c) => {
+    const denied = requireAdmin(c);
+    if (denied)
+      return denied;
+
+    const input = parseAuthorInput(await readJson(c));
+    if (!input.ok)
+      return c.json({ error: input.error }, 400);
+
+    const clash = authorClash(db, input.value);
+    if (clash !== null)
+      return c.json({ error: clash }, 409);
+
+    return c.json({ author: createAuthor(db, input.value) }, 201);
+  });
+
+  app.patch('/api/admin/authors/:id', async (c) => {
+    const denied = requireAdmin(c);
+    if (denied)
+      return denied;
+
+    const id = parseId(c.req.param('id'));
+    if (id === null)
+      return c.json({ error: 'Unknown author.' }, 404);
+
+    const input = parseAuthorInput(await readJson(c));
+    if (!input.ok)
+      return c.json({ error: input.error }, 400);
+
+    const clash = authorClash(db, input.value, id);
+    if (clash !== null)
+      return c.json({ error: clash }, 409);
+
+    const author = updateAuthor(db, id, input.value);
+
+    return author === null ? c.json({ error: 'Unknown author.' }, 404) : c.json({ author });
+  });
+
+  /** Deletes the author only: the prizes stay, unlinked, and the count says how many. */
+  app.delete('/api/admin/authors/:id', (c) => {
+    const denied = requireAdmin(c);
+    if (denied)
+      return denied;
+
+    const id = parseId(c.req.param('id'));
+    const unlinked = id === null ? null : deleteAuthor(db, id);
+    if (unlinked === null)
+      return c.json({ error: 'Unknown author.' }, 404);
+
+    return c.json({ assets: adminCatalogue(db, keyEncryptionSecret), unlinked });
+  });
+
+  /** Links every prize published under a publisher string, in one action. */
+  app.post('/api/admin/authors/:id/attach', async (c) => {
+    const denied = requireAdmin(c);
+    if (denied)
+      return denied;
+
+    const id = parseId(c.req.param('id'));
+    if (id === null || findAuthorById(db, id) === null)
+      return c.json({ error: 'Unknown author.' }, 404);
+
+    const publisher = (await readJson(c))?.publisher;
+    if (typeof publisher !== 'string' || publisher.trim() === '')
+      return c.json({ error: 'Give the publisher name to attach prizes by.' }, 400);
+
+    const attached = attachAuthorByPublisher(db, id, publisher);
+
+    return c.json({ assets: adminCatalogue(db, keyEncryptionSecret), attached });
   });
 
   app.notFound((c) => {

@@ -8,7 +8,7 @@
  */
 import type { DatabaseHandle } from './db.ts';
 
-import { createAsset, findAssetByAssetId } from './repository.ts';
+import { createAsset, findAssetByAssetId, findAuthorByPublisher } from './repository.ts';
 import { assertAssetStoreUrl, fetchAssetPage } from './unity-fetch.ts';
 import { MetadataError, parseAssetPage } from './unity.ts';
 import { assetInputFromMetadata } from './validate.ts';
@@ -59,7 +59,14 @@ export async function importAssets(
         return { name: existing.name, message: 'Already in the list.', status: 'duplicate', url: url.href };
       }
 
-      const asset = createAsset(db, assetInputFromMetadata(metadata), keyEncryptionSecret);
+      // A known publisher means the prize lands already attached to its author,
+      // exactly as the single-asset form preselects one.
+      const author = findAuthorByPublisher(db, metadata.publisher);
+      const asset = createAsset(
+        db,
+        { ...assetInputFromMetadata(metadata), authorId: author?.id ?? null },
+        keyEncryptionSecret,
+      );
 
       return { name: asset.name, message: null, status: 'added', url: asset.assetUrl };
     }

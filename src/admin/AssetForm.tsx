@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
+import { authorExtras } from '@/admin/asset-table';
+import { AuthorForm } from '@/admin/AuthorForm';
 import { api } from '@/api';
 
-import type { AdminAsset } from '../../server/payloads.ts';
+import type { AdminAsset, AdminAuthor } from '../../server/payloads.ts';
 import type { AssetInput } from '../../server/validate.ts';
 
 interface AssetFormProps {
@@ -26,15 +28,42 @@ function toCents(price: string): number | null {
   return Number.isFinite(amount) && amount >= 0 ? Math.round(amount * 100) : Number.NaN;
 }
 
+/** The editable fields of a stored prize, so the form works on one shape. */
+function toInput(asset: AdminAsset): AssetInput {
+  return {
+    name: asset.name,
+    assetId: asset.assetId,
+    assetUrl: asset.assetUrl,
+    authorId: asset.author?.id ?? null,
+    category: asset.category,
+    imageUrl: asset.imageUrl,
+    notes: asset.notes,
+    priceCents: asset.priceCents,
+    publisher: asset.publisher,
+  };
+}
+
 /** Add or edit one prize. Every field stays editable, whatever the page gave us. */
 export function AssetForm({ editing, metadata, onCancel, onSaved }: AssetFormProps) {
   // The parent remounts this form when the draft changes (through its `key`),
   // so the fields start from the draft and stay put while it is being edited.
-  const [source, setSource] = useState<AssetInput | null>(() => editing ?? metadata);
+  const [source, setSource] = useState<AssetInput | null>(() => (editing === null ? metadata : toInput(editing)));
+  const [authors, setAuthors] = useState<AdminAuthor[]>([]);
+  const [choosingAuthor, setChoosingAuthor] = useState(false);
   const [url, setUrl] = useState(() => editing?.assetUrl ?? metadata?.assetUrl ?? '');
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [price, setPrice] = useState(() => toPriceInput(editing?.priceCents ?? metadata?.priceCents ?? null));
+
+  // The author list is small and barely changes, so one read per form is enough.
+  useEffect(() => {
+    api.authors()
+      .then(result => setAuthors(result.authors))
+      .catch((cause: unknown) => setMessage(cause instanceof Error ? cause.message : String(cause)));
+  }, []);
+
+  const sourceAuthorId = source?.authorId ?? null;
+  const attached = sourceAuthorId === null ? null : authors.find(author => author.id === sourceAuthorId) ?? null;
 
   /** For a prize the Asset Store page cannot provide, or that is not on the store. */
   function startBlank(): void {
@@ -42,6 +71,7 @@ export function AssetForm({ editing, metadata, onCancel, onSaved }: AssetFormPro
       name: '',
       assetId: '',
       assetUrl: url.trim(),
+      authorId: null,
       category: null,
       imageUrl: null,
       notes: null,
@@ -62,8 +92,9 @@ export function AssetForm({ editing, metadata, onCancel, onSaved }: AssetFormPro
       setPrice(toPriceInput(lookup.metadata.priceCents));
       setUrl(lookup.metadata.assetUrl);
 
+      const matched = lookup.metadata.authorId === null ? '' : ' The publisher matched an author, already chosen below.';
       setMessage(lookup.existingAsset === null
-        ? 'Read the page. Check the fields, then save.'
+        ? `Read the page. Check the fields, then save.${matched}`
         : `Careful: "${lookup.existingAsset.name}" is already in the list with the same Unity id.`);
     }
     catch (cause) {
@@ -157,6 +188,52 @@ export function AssetForm({ editing, metadata, onCancel, onSaved }: AssetFormPro
                   value={source.publisher ?? ''}
                 />
               </label>
+
+              <div className="field field-wide">
+                <span id="prize-author-label">Author (private)</span>
+                <div className="field-row">
+                  <select
+                    aria-labelledby="prize-author-label"
+                    className="field-grow"
+                    onChange={event => update('authorId', event.target.value === '' ? null : Number(event.target.value))}
+                    value={sourceAuthorId ?? ''}
+                  >
+                    <option value="">Nobody yet</option>
+                    {authors.map(author => (
+                      <option key={author.id} value={author.id}>{author.label}</option>
+                    ))}
+                  </select>
+                  <button
+                    className="button-quiet"
+                    onClick={() => setChoosingAuthor(current => !current)}
+                    type="button"
+                  >
+                    {choosingAuthor ? 'Cancel the new author' : 'New author'}
+                  </button>
+                </div>
+                <span className="hint">
+                  {attached === null
+                    ? 'No author attached. Create one once — their other prizes find them by the publisher name.'
+                    : authorExtras(attached).join(' · ') || 'Nothing else recorded.'}
+                </span>
+              </div>
+
+              {choosingAuthor
+                ? (
+                    <div className="field-wide">
+                      <AuthorForm
+                        editing={null}
+                        onCancel={() => setChoosingAuthor(false)}
+                        onSaved={(author) => {
+                          setAuthors(current => [...current, author].sort((left, right) => left.label.localeCompare(right.label)));
+                          update('authorId', author.id);
+                          setChoosingAuthor(false);
+                        }}
+                        publisher={source.publisher}
+                      />
+                    </div>
+                  )
+                : null}
 
               <label className="field">
                 <span>Category</span>

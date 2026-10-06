@@ -1,6 +1,40 @@
 import { index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 /**
+ * The author behind one or more prizes: the whole catalogue comes from a handful
+ * of people, so the person is a record of its own rather than a field copied onto
+ * every prize. Private, like the contact it replaces: no author data reaches a
+ * public response.
+ *
+ * There is no name column: an author is shown by their Discord handle, then by
+ * the store publisher, which is the one label a prize fills in by itself. A
+ * publisher string of their own is therefore worth more than a free-text name.
+ *
+ * `discordHandle` is a mutable display name and `discordId` is the snowflake that
+ * never changes, which is why both are kept. Neither is required on its own, but
+ * at least one of the three identifying fields has to be there — a record with
+ * none of them is noise (see `parseAuthorInput`).
+ *
+ * `publisher` is the store publisher string the prizes were read from, and it is
+ * what lets a prize find its author unasked: the form and the bulk import match
+ * on it. It is unique among authors, because a preselect that could mean two
+ * people is worse than none — the second author claiming a publisher is refused
+ * with a readable sentence instead.
+ */
+export const authors = sqliteTable('authors', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
+  discordHandle: text('discord_handle').unique(),
+  discordId: text('discord_id').unique(),
+  publisher: text('publisher').unique(),
+  updatedAt: integer('updated_at', { mode: 'timestamp_ms' })
+    .notNull()
+    .$defaultFn(() => new Date())
+    // See the note on `assets.updatedAt`.
+    .$onUpdate(() => new Date()),
+});
+
+/**
  * One prize: a Unity asset donated to a jam.
  *
  * `assetId` is Unity's own identifier, kept as text — it is a label, not a
@@ -14,11 +48,17 @@ export const assets = sqliteTable('assets', {
   name: text('name').notNull(),
   assetId: text('asset_id').notNull().unique(),
   assetUrl: text('asset_url').notNull(),
+  /**
+   * The person who donated it. Null means nobody has been attached yet, and it
+   * is `SET NULL` rather than a cascade: deleting an author must never delete a
+   * prize. The reverse still holds — deleting the prize removes its keys.
+   */
+  authorId: integer('author_id').references(() => authors.id, { onDelete: 'set null' }),
   category: text('category'),
   createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
   /**
    * Hidden from the public catalogue while staying in the admin list with its
-   * keys and contact: pulling a prize off the public page never loses anything,
+   * keys and author: pulling a prize off the public page never loses anything,
    * and it can be shown again. The default is in SQL so adding the column gives
    * the rows already in the table a value.
    */
@@ -34,25 +74,10 @@ export const assets = sqliteTable('assets', {
     // Without this Drizzle omits the column from every UPDATE, so `updatedAt`
     // would silently stay equal to `createdAt`.
     .$onUpdate(() => new Date()),
-});
-
-/**
- * The author behind a prize. Private: the Discord handle never reaches a
- * public response. One per asset, which the unique index enforces.
- */
-export const contacts = sqliteTable('contacts', {
-  id: integer('id').primaryKey({ autoIncrement: true }),
-  contactNotes: text('contact_notes'),
-  createdAt: integer('created_at', { mode: 'timestamp_ms' }).notNull().$defaultFn(() => new Date()),
-  discordHandle: text('discord_handle').notNull(),
-  assetId: integer('asset_id')
-    .notNull()
-    .unique()
-    .references(() => assets.id, { onDelete: 'cascade' }),
 }, table => [
-  // SQLite does not index foreign keys; without this, cascading a delete and
-  // looking up an asset's authors both scan the whole table.
-  index('contacts_asset_id_index').on(table.assetId),
+  // SQLite does not index foreign keys, and the admin screen lists an author's
+  // prizes through this column.
+  index('assets_author_id_index').on(table.authorId),
 ]);
 
 /**
@@ -74,13 +99,13 @@ export const keys = sqliteTable('keys', {
     .notNull()
     .references(() => assets.id, { onDelete: 'cascade' }),
 }, table => [
-  // See contacts: the foreign key is not indexed by SQLite, and the gallery
-  // counts an asset's keys on every page.
+  // See the note on `assets.authorId`: SQLite does not index foreign keys, and
+  // the gallery counts an asset's keys on every page.
   index('keys_asset_id_index').on(table.assetId),
 ]);
 
 export type Asset = typeof assets.$inferSelect;
-export type Contact = typeof contacts.$inferSelect;
+export type Author = typeof authors.$inferSelect;
 export type Key = typeof keys.$inferSelect;
 
 /**

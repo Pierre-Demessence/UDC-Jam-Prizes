@@ -2,19 +2,39 @@
  * Database access. SQLite is synchronous, so these are plain functions: every
  * one returns finished data rather than a promise.
  */
-import { and, asc, eq, lt, sql } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, lt, sql } from 'drizzle-orm';
 
 import type { AttemptStore } from './auth.ts';
 import type { DatabaseHandle } from './db.ts';
-import type { AdminAsset, PublicCatalogue } from './payloads.ts';
-import type { Asset } from './schema.ts';
-import type { AssetInput, ContactInput } from './validate.ts';
+import type { AdminAsset, AdminAuthor, PublicCatalogue } from './payloads.ts';
+import type { Asset, Author } from './schema.ts';
+import type { AssetInput, AuthorInput } from './validate.ts';
 
-import { toAdminAsset, toPublicAsset } from './payloads.ts';
-import { assets, contacts, keys, rateLimitAttempts } from './schema.ts';
+import { toAdminAsset, toAdminAuthor, toPublicAsset } from './payloads.ts';
+import { assets, authors, keys, rateLimitAttempts } from './schema.ts';
 import { decryptSecret, encryptSecret, fingerprintSecret, isEncrypted } from './secrets.ts';
 
 type Db = DatabaseHandle['db'];
+
+/** How many prizes hang off one author. */
+function assetCount(db: Db, authorId: number): number {
+  return db
+    .select({ count: sql<number>`count(*)` })
+    .from(assets)
+    .where(eq(assets.authorId, authorId))
+    .get()
+    ?.count ?? 0;
+}
+
+/** One author with its prize count, or null when the id is null or unknown. */
+function authorPayload(db: Db, authorId: number | null): AdminAuthor | null {
+  if (authorId === null)
+    return null;
+
+  const author = findAuthorById(db, authorId);
+
+  return author === null ? null : toAdminAuthor(author, assetCount(db, authorId));
+}
 
 /** The public catalogue: shaped fields only, plus the totals the header shows. */
 export function publicCatalogue(db: Db): PublicCatalogue {
@@ -41,13 +61,20 @@ export function publicCatalogue(db: Db): PublicCatalogue {
 export function adminCatalogue(db: Db, secret: string): AdminAsset[] {
   const rows = db.select().from(assets).orderBy(asc(assets.name)).all();
   // Loaded in bulk and grouped here: a jam's prize list is small, and this
-  // keeps one query per table instead of one per asset.
-  const contactRows = db.select().from(contacts).all();
+  // keeps one query per table instead of one per prize.
+  const authorRows = db.select().from(authors).all();
   const keyRows = db.select().from(keys).all();
+  const counts = new Map<number, number>();
+  for (const row of rows) {
+    if (row.authorId !== null)
+      counts.set(row.authorId, (counts.get(row.authorId) ?? 0) + 1);
+  }
+
+  const known = new Map(authorRows.map(author => [author.id, toAdminAuthor(author, counts.get(author.id) ?? 0)]));
 
   return rows.map(asset => toAdminAsset(
     asset,
-    contactRows.find(contact => contact.assetId === asset.id) ?? null,
+    asset.authorId === null ? null : known.get(asset.authorId) ?? null,
     keyRows.filter(key => key.assetId === asset.id),
     secret,
   ));
@@ -58,10 +85,9 @@ export function adminAsset(db: Db, id: number, secret: string): AdminAsset | nul
   if (!asset)
     return null;
 
-  const contact = db.select().from(contacts).where(eq(contacts.assetId, id)).get() ?? null;
   const rows = db.select().from(keys).where(eq(keys.assetId, id)).all();
 
-  return toAdminAsset(asset, contact, rows, secret);
+  return toAdminAsset(asset, authorPayload(db, asset.authorId), rows, secret);
 }
 
 export function findAssetByAssetId(db: Db, assetId: string): Asset | null {
@@ -71,7 +97,7 @@ export function findAssetByAssetId(db: Db, assetId: string): Asset | null {
 export function createAsset(db: Db, input: AssetInput, secret: string): AdminAsset {
   const asset = db.insert(assets).values(input).returning().get();
 
-  return toAdminAsset(asset, null, [], secret);
+  return toAdminAsset(asset, authorPayload(db, asset.authorId), [], secret);
 }
 
 export function updateAsset(db: Db, id: number, input: AssetInput, secret: string): AdminAsset | null {
@@ -97,7 +123,7 @@ export function updateNeeded(db: Db, id: number, needed: number, secret: string)
 
 /**
  * Shows or hides a prize on the public side, from the admin table's own button.
- * The row itself is never touched: hiding keeps its keys, contact and notes.
+ * The row itself is never touched: hiding keeps its keys and its author.
  */
 export function updateHidden(db: Db, id: number, hidden: boolean, secret: string): AdminAsset | null {
   const existing = db.select().from(assets).where(eq(assets.id, id)).get();
@@ -109,12 +135,86 @@ export function updateHidden(db: Db, id: number, hidden: boolean, secret: string
   return adminAsset(db, id, secret);
 }
 
-/** One contact per asset: the author behind the prize. */
-export function saveContact(db: Db, assetId: number, input: ContactInput): void {
-  db.insert(contacts)
-    .values({ ...input, assetId })
-    .onConflictDoUpdate({ set: input, target: contacts.assetId })
-    .run();
+/** Every author with their prize count, ordered by the label the admin sees. */
+export function listAuthors(db: Db): AdminAuthor[] {
+  const counts = new Map(
+    db
+      .select({ authorId: assets.authorId, count: sql<number>`count(*)` })
+      .from(assets)
+      .where(isNotNull(assets.authorId))
+      .groupBy(assets.authorId)
+      .all()
+      .map(row => [row.authorId as number, row.count] as const),
+  );
+
+  // Sorted here rather than in SQL: the label is a fallback chain, and the panel
+  // and the prize form both show exactly what this orders.
+  return db.select().from(authors).all().map(author => toAdminAuthor(author, counts.get(author.id) ?? 0)).sort((left, right) => left.label.localeCompare(right.label));
+}
+
+export function findAuthorById(db: Db, id: number): Author | null {
+  return db.select().from(authors).where(eq(authors.id, id)).get() ?? null;
+}
+
+/**
+ * The author whose publisher matches, case-insensitively: the lookup the prize
+ * form and the bulk import use to attach an author without being asked.
+ */
+export function findAuthorByPublisher(db: Db, publisher: string | null): Author | null {
+  if (publisher === null || publisher.trim() === '')
+    return null;
+
+  return db.select().from(authors).where(sql`lower(${authors.publisher}) = ${publisher.trim().toLowerCase()}`).get() ?? null;
+}
+
+/** The clash checks behind the author routes: a handle or an id already taken. */
+export function findAuthorByDiscordHandle(db: Db, handle: string): Author | null {
+  return db.select().from(authors).where(sql`lower(${authors.discordHandle}) = ${handle.trim().toLowerCase()}`).get() ?? null;
+}
+
+export function findAuthorByDiscordId(db: Db, discordId: string): Author | null {
+  return db.select().from(authors).where(eq(authors.discordId, discordId)).get() ?? null;
+}
+
+export function createAuthor(db: Db, input: AuthorInput): AdminAuthor {
+  const author = db.insert(authors).values(input).returning().get();
+
+  return toAdminAuthor(author, 0);
+}
+
+export function updateAuthor(db: Db, id: number, input: AuthorInput): AdminAuthor | null {
+  const author = db.update(authors).set(input).where(eq(authors.id, id)).returning().get();
+
+  return author === undefined ? null : toAdminAuthor(author, assetCount(db, id));
+}
+
+/**
+ * Deletes an author and clears the link on their prizes — what `ON DELETE SET
+ * NULL` does too, but doing it here is what lets the count come back for the
+ * notice. Returns how many prizes were unlinked, or null when there is no such
+ * author.
+ */
+export function deleteAuthor(db: Db, id: number): number | null {
+  if (findAuthorById(db, id) === null)
+    return null;
+
+  const unlinked = db.update(assets).set({ authorId: null }).where(eq(assets.authorId, id)).run().changes;
+  db.delete(authors).where(eq(authors.id, id)).run();
+
+  return unlinked;
+}
+
+/**
+ * Attaches every prize whose publisher matches, case-insensitively: the action
+ * that clears a whole back catalogue for one author in a click. Returns how many
+ * prizes were linked.
+ */
+export function attachAuthorByPublisher(db: Db, authorId: number, publisher: string): number {
+  return db.update(assets)
+    .set({ authorId })
+    .where(sql`lower(${assets.publisher}) = ${publisher.trim().toLowerCase()}`)
+    .run()
+    .changes;
 }
 
 /**

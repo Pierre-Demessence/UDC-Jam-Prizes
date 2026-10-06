@@ -22,6 +22,8 @@ const MAX_NOTES = 2000;
 const MAX_URL = 2000;
 const MAX_KEY = 200;
 const MAX_HANDLE = 100;
+/** A Discord snowflake: digits only, and never a JS number, which would lose precision. */
+const DISCORD_ID = /^\d{17,20}$/;
 /** Nobody is going to hand out more keys than this for one prize. */
 const MAX_NEEDED = 999;
 /** One paste of links, so a single request cannot turn into a long crawl. */
@@ -31,6 +33,8 @@ export interface AssetInput {
   name: string;
   assetId: string;
   assetUrl: string;
+  /** The attached author, or null for none. Whether it exists is the route's check. */
+  authorId: number | null;
   category: string | null;
   imageUrl: string | null;
   notes: string | null;
@@ -38,9 +42,15 @@ export interface AssetInput {
   publisher: string | null;
 }
 
-export interface ContactInput {
-  contactNotes: string | null;
-  discordHandle: string;
+/**
+ * One author. No field is required on its own, but at least one of the three
+ * identifying ones must be given: a record with none of them could not be found
+ * again, contacted, or told apart from the next one.
+ */
+export interface AuthorInput {
+  discordHandle: string | null;
+  discordId: string | null;
+  publisher: string | null;
 }
 
 function text(value: unknown, field: string, max: number, required: boolean): Validation<string | null> {
@@ -87,6 +97,21 @@ function httpUrl(value: string | null, field: string): Validation<string | null>
   }
 }
 
+/**
+ * The author link: an id or nothing at all. Whether that id exists is the
+ * route's check, next to the Unity-id clash it already makes.
+ */
+function authorLink(value: unknown): Validation<number | null> {
+  if (value === undefined || value === null || value === '')
+    return { ok: true, value: null };
+
+  const id = typeof value === 'number' ? value : Number(String(value).trim());
+
+  return Number.isInteger(id) && id > 0
+    ? { ok: true, value: id }
+    : { error: 'The author must be an author id.', ok: false };
+}
+
 export function parseAssetInput(body: unknown): Validation<AssetInput> {
   if (typeof body !== 'object' || body === null)
     return { error: 'Expected a JSON object.', ok: false };
@@ -100,6 +125,7 @@ export function parseAssetInput(body: unknown): Validation<AssetInput> {
   const imageUrl = text(raw.imageUrl, 'The image URL', MAX_URL, false);
   const notes = text(raw.notes, 'The notes', MAX_NOTES, false);
   const priceCents = money(raw.priceCents);
+  const authorId = authorLink(raw.authorId);
 
   if (!name.ok)
     return name;
@@ -117,6 +143,8 @@ export function parseAssetInput(body: unknown): Validation<AssetInput> {
     return notes;
   if (!priceCents.ok)
     return priceCents;
+  if (!authorId.ok)
+    return authorId;
 
   const checkedUrl = httpUrl(assetUrl.value, 'The Asset Store URL');
   if (!checkedUrl.ok)
@@ -132,6 +160,7 @@ export function parseAssetInput(body: unknown): Validation<AssetInput> {
       name: name.value as string,
       assetId: assetId.value as string,
       assetUrl: checkedUrl.value as string,
+      authorId: authorId.value,
       category: category.value,
       imageUrl: checkedImage.value,
       notes: notes.value,
@@ -147,6 +176,8 @@ export function assetInputFromMetadata(metadata: AssetMetadata): AssetInput {
     name: metadata.name,
     assetId: metadata.assetId,
     assetUrl: metadata.assetUrl,
+    // Nobody yet: the route fills this from the publisher it matched.
+    authorId: null,
     category: metadata.category,
     imageUrl: metadata.imageUrl,
     notes: null,
@@ -155,24 +186,34 @@ export function assetInputFromMetadata(metadata: AssetMetadata): AssetInput {
   };
 }
 
-export function parseContactInput(body: unknown): Validation<ContactInput> {
+export function parseAuthorInput(body: unknown): Validation<AuthorInput> {
   if (typeof body !== 'object' || body === null)
     return { error: 'Expected a JSON object.', ok: false };
 
   const raw = body as Record<string, unknown>;
-  const discordHandle = text(raw.discordHandle, 'The Discord handle', MAX_HANDLE, true);
-  const contactNotes = text(raw.contactNotes, 'The contact notes', MAX_NOTES, false);
+  const discordHandle = text(raw.discordHandle, 'The Discord handle', MAX_HANDLE, false);
+  const discordId = text(raw.discordId, 'The Discord id', 30, false);
+  const publisher = text(raw.publisher, 'The publisher', MAX_NAME, false);
 
   if (!discordHandle.ok)
     return discordHandle;
-  if (!contactNotes.ok)
-    return contactNotes;
+  if (!discordId.ok)
+    return discordId;
+  if (!publisher.ok)
+    return publisher;
+
+  if (discordId.value !== null && !DISCORD_ID.test(discordId.value))
+    return { error: 'The Discord id is the 17 to 20 digit number Discord shows; the handle is the name beside it.', ok: false };
+
+  if (discordHandle.value === null && discordId.value === null && publisher.value === null)
+    return { error: 'An author needs a store publisher, a Discord handle or a Discord id.', ok: false };
 
   return {
     ok: true,
     value: {
-      contactNotes: contactNotes.value,
-      discordHandle: discordHandle.value as string,
+      discordHandle: discordHandle.value,
+      discordId: discordId.value,
+      publisher: publisher.value,
     },
   };
 }

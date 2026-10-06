@@ -461,16 +461,6 @@ button:disabled {
   font-size: 0.9rem;
 }
 
-.table-caption {
-  padding: 10px 12px 0;
-  color: var(--text-muted);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.12em;
-  text-align: left;
-  text-transform: uppercase;
-}
-
 .admin-table th,
 .admin-table td {
   padding: 9px 12px;
@@ -503,6 +493,12 @@ button:disabled {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+}
+
+/* The author table's headers are plain text rather than sort buttons, and the
+   padding above belongs to the button, so these cells pad themselves. */
+.author-table thead th {
+  padding: 10px 12px;
 }
 
 .admin-table th.cell-number .table-sort {

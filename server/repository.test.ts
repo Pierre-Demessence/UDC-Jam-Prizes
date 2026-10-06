@@ -1,10 +1,11 @@
 // @vitest-environment node
+import { eq } from 'drizzle-orm';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import type { DatabaseHandle } from './db.ts';
 
 import { connectDatabase } from './db.ts';
-import { adminAsset, createAttemptStore, encryptLegacyKeys } from './repository.ts';
+import { adminAsset, attachAuthorByPublisher, createAttemptStore, createAuthor, deleteAuthor, encryptLegacyKeys, findAuthorByPublisher, listAuthors } from './repository.ts';
 import { assets, keys } from './schema.ts';
 import { encryptSecret } from './secrets.ts';
 import { testConfig } from './testing.ts';
@@ -170,5 +171,94 @@ describe('the limiter store', () => {
     createAttemptStore(handle.db).save('login', 'a', [NOW]);
 
     expect(createAttemptStore(handle.db).load('login', 'a')).toEqual([NOW]);
+  });
+});
+
+describe('the authors behind the prizes', () => {
+  let prize = 0;
+
+  function addPrize(publisher: string | null): number {
+    prize += 1;
+
+    return handle.db
+      .insert(assets)
+      .values({
+        name: `Prize ${prize}`,
+        assetId: `prize-${prize}`,
+        assetUrl: 'https://assetstore.unity.com/packages/tools/a-prize-1',
+        publisher,
+      })
+      .returning()
+      .get()
+      .id;
+  }
+
+  function addAuthor(overrides: Partial<Parameters<typeof createAuthor>[1]> = {}) {
+    return createAuthor(handle.db, {
+      discordHandle: 'priya',
+      discordId: '123456789012345678',
+      publisher: 'VIVID Arts',
+      ...overrides,
+    });
+  }
+
+  it('finds an author by publisher whatever the case and spacing', () => {
+    const author = addAuthor();
+
+    expect(findAuthorByPublisher(handle.db, '  vivid arts ')?.id).toBe(author.id);
+    expect(findAuthorByPublisher(handle.db, 'VIVID ARTS')?.id).toBe(author.id);
+    expect(findAuthorByPublisher(handle.db, 'Someone else')).toBeNull();
+    expect(findAuthorByPublisher(handle.db, null)).toBeNull();
+  });
+
+  it('attaches every prize published under a string, and reports how many', () => {
+    const author = addAuthor();
+    const first = addPrize('VIVID Arts');
+    const second = addPrize('vivid arts');
+    const other = addPrize('Other Studio');
+    const noPublisher = addPrize(null);
+
+    expect(attachAuthorByPublisher(handle.db, author.id, 'VIVID ARTS')).toBe(2);
+
+    const linked = (id: number) => handle.db.select().from(assets).where(eq(assets.id, id)).get()?.authorId;
+    expect([linked(first), linked(second)]).toEqual([author.id, author.id]);
+    expect([linked(other), linked(noPublisher)]).toEqual([null, null]);
+  });
+
+  it('deletes the author only, leaving the prize and its keys in place', () => {
+    const author = addAuthor();
+    const id = addPrize('VIVID Arts');
+    attachAuthorByPublisher(handle.db, author.id, 'VIVID Arts');
+    handle.db.insert(keys).values({ assetId: id, keyValue: 'v1:ciphertext' }).run();
+
+    expect(deleteAuthor(handle.db, author.id)).toBe(1);
+    expect(handle.db.select().from(assets).where(eq(assets.id, id)).get()?.authorId).toBeNull();
+    expect(handle.db.select().from(keys).all()).toHaveLength(1);
+    expect(deleteAuthor(handle.db, author.id)).toBeNull();
+  });
+
+  it('counts each author\'s prizes, and says nothing rather than guessing', () => {
+    const busy = addAuthor({ discordHandle: 'busy', publisher: 'Studio One' });
+    addAuthor({ discordHandle: 'idle', discordId: null });
+    addPrize('VIVID Arts');
+    attachAuthorByPublisher(handle.db, busy.id, 'VIVID Arts');
+
+    expect(listAuthors(handle.db).map(author => [author.label, author.assetCount])).toEqual([
+      ['busy', 1],
+      ['idle', 0],
+    ]);
+  });
+
+  it('names an author by their handle, then by their publisher', () => {
+    const named = addAuthor({ discordHandle: 'kim', publisher: 'VIVID Arts' });
+    const namedByPublisher = addAuthor({ discordHandle: null, discordId: null, publisher: 'Other Studio' });
+    const namedById = addAuthor({ discordHandle: null, discordId: '999999999999999999', publisher: null });
+
+    const labels = new Map(listAuthors(handle.db).map(author => [author.id, author.label]));
+
+    expect(labels.get(named.id)).toBe('kim');
+    expect(labels.get(namedByPublisher.id)).toBe('Other Studio');
+    // An id alone is a poor name, but it is what the record has.
+    expect(labels.get(namedById.id)).toBe(`Author #${namedById.id}`);
   });
 });

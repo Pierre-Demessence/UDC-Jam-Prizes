@@ -55,6 +55,18 @@ async function addAsset(cookie: string): Promise<Record<string, unknown>> {
   return (await response.json() as { asset: Record<string, unknown> }).asset;
 }
 
+/** Creates an author the way the panel does, with the fields a test asks for. */
+async function addAuthor(cookie: string, overrides: Record<string, unknown> = {}): Promise<Record<string, unknown>> {
+  const response = await app.request('/api/admin/authors', json({
+    discordHandle: 'priya',
+    discordId: '123456789012345678',
+    publisher: 'VIVID Arts',
+    ...overrides,
+  }, cookie));
+
+  return (await response.json() as { author: Record<string, unknown> }).author;
+}
+
 describe('the session endpoints', () => {
   it('rejects a wrong password', async () => {
     const response = await app.request('/api/session', json({ password: 'nope' }));
@@ -138,11 +150,15 @@ describe('the admin gate', () => {
       ['/api/admin/assets', { method: 'POST' }],
       ['/api/admin/assets/1', { method: 'PATCH' }],
       ['/api/admin/assets/1', { method: 'DELETE' }],
-      ['/api/admin/assets/1/contact', { method: 'PUT' }],
       ['/api/admin/assets/1/keys', { method: 'POST' }],
       ['/api/admin/assets/1/keys/1', { method: 'DELETE' }],
       ['/api/admin/assets/1/needed', { method: 'PUT' }],
       ['/api/admin/assets/1/hidden', { method: 'PUT' }],
+      ['/api/admin/authors', { method: 'GET' }],
+      ['/api/admin/authors', { method: 'POST' }],
+      ['/api/admin/authors/1', { method: 'PATCH' }],
+      ['/api/admin/authors/1', { method: 'DELETE' }],
+      ['/api/admin/authors/1/attach', { method: 'POST' }],
       ['/api/metadata', { method: 'POST' }],
     ];
 
@@ -162,7 +178,7 @@ describe('the admin gate', () => {
 });
 
 describe('the public catalogue', () => {
-  it('leaves a public visitor with the nine public fields and nothing else', async () => {
+  it('leaves a public visitor with the eight public fields and nothing else', async () => {
     const cookie = await signIn();
     await addAsset(cookie);
 
@@ -262,19 +278,27 @@ describe('editing assets', () => {
     expect(await response.json()).toHaveProperty('error', expect.stringContaining('required'));
   });
 
-  it('deletes the asset with its contacts and keys, so it leaves the public list', async () => {
+  it('deletes the asset with its keys, and leaves its author alone', async () => {
     const cookie = await signIn();
     const asset = await addAsset(cookie);
-    await app.request(`/api/admin/assets/${asset.id}/contact`, json({ discordHandle: 'someone' }, cookie));
+    const author = await addAuthor(cookie);
+    await app.request(`/api/admin/assets/${asset.id}`, {
+      body: JSON.stringify({ ...asset, authorId: author.id }),
+      headers: { 'content-type': 'application/json', cookie },
+      method: 'PATCH',
+    });
     await app.request(`/api/admin/assets/${asset.id}/keys`, json({ keys: 'KEY-1' }, cookie));
 
     const deleted = await app.request(`/api/admin/assets/${asset.id}`, { headers: { cookie }, method: 'DELETE' });
     const catalogue = await (await app.request('/api/assets')).json() as { totals: { count: number } };
+    const authors = await (await app.request('/api/admin/authors', { headers: { cookie } }))
+      .json() as { authors: { assetCount: number; id: number }[] };
 
     expect(deleted.status).toBe(204);
     expect(catalogue.totals.count).toBe(0);
-    expect(handle.sqlite.prepare('select count(*) as n from contacts').get()).toEqual({ n: 0 });
     expect(handle.sqlite.prepare('select count(*) as n from keys').get()).toEqual({ n: 0 });
+    // An author outlives the prizes: this is the opposite direction from the keys.
+    expect(authors.authors.find(row => row.id === author.id)?.assetCount).toBe(0);
   });
 });
 
@@ -413,21 +437,112 @@ describe('the keys behind a prize', () => {
     expect(response.status).toBe(404);
   });
 
-  it('stores the contact of the author without publishing it', async () => {
+  it('stores the author of a prize without publishing any of it', async () => {
     const cookie = await signIn();
+    const author = await addAuthor(cookie);
     const asset = await addAsset(cookie);
-    const response = await app.request(`/api/admin/assets/${asset.id}/contact`, {
-      body: JSON.stringify({ contactNotes: 'replies slowly', discordHandle: 'author#1' }),
-      headers: { 'content-type': 'application/json', cookie },
-      method: 'PUT',
-    });
 
-    const admin = await response.json() as { asset: { contact: { discordHandle: string } } };
+    const response = await app.request(`/api/admin/assets/${asset.id}`, {
+      body: JSON.stringify({ ...asset, authorId: author.id }),
+      headers: { 'content-type': 'application/json', cookie },
+      method: 'PATCH',
+    });
+    const admin = await response.json() as { asset: { author: { assetCount: number; label: string } } };
     const publicBody = await (await app.request('/api/assets')).text();
 
-    expect(admin.asset.contact.discordHandle).toBe('author#1');
-    expect(publicBody).not.toContain('author#1');
-    expect(publicBody).not.toContain('replies slowly');
+    // Named by the handle, since that is what the author was given.
+    expect(admin.asset.author.label).toBe('priya');
+    expect(admin.asset.author.assetCount).toBe(1);
+    // The handle and the id are private: neither may reach the public list.
+    expect(publicBody).not.toContain('priya');
+    expect(publicBody).not.toContain('123456789012345678');
+  });
+});
+
+describe('the authors behind the prizes', () => {
+  it('refuses a second author on the same publisher, whatever the case', async () => {
+    const cookie = await signIn();
+    await addAuthor(cookie);
+
+    const same = await app.request('/api/admin/authors', json({ publisher: 'VIVID Arts' }, cookie));
+    const otherCase = await app.request('/api/admin/authors', json({ publisher: 'vivid arts' }, cookie));
+
+    expect([same.status, otherCase.status]).toEqual([409, 409]);
+    expect(await same.json()).toHaveProperty('error', expect.stringContaining('VIVID Arts'));
+  });
+
+  it('refuses an author with nothing to be found by', async () => {
+    const cookie = await signIn();
+    const response = await app.request('/api/admin/authors', json({}, cookie));
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toHaveProperty('error', expect.stringContaining('needs a store publisher'));
+  });
+
+  it('refuses a Discord id that is not a snowflake', async () => {
+    const cookie = await signIn();
+    const tooShort = await app.request('/api/admin/authors', json({ discordId: '1234567890123456' }, cookie));
+    const tooLong = await app.request('/api/admin/authors', json({ discordId: '123456789012345678901' }, cookie));
+    const notDigits = await app.request('/api/admin/authors', json({ discordId: 'priya#1' }, cookie));
+
+    expect([tooShort.status, tooLong.status, notDigits.status]).toEqual([400, 400, 400]);
+    expect(await notDigits.json()).toHaveProperty('error', expect.stringContaining('17 to 20 digit'));
+  });
+
+  it('refuses a Discord handle or id another author already has', async () => {
+    const cookie = await signIn();
+    await addAuthor(cookie);
+
+    // The stored handle is lower-case; the clash must not care about the case.
+    const handle = await app.request('/api/admin/authors', json({ discordHandle: 'Priya' }, cookie));
+    const id = await app.request('/api/admin/authors', json({ discordId: '123456789012345678' }, cookie));
+
+    expect([handle.status, id.status]).toEqual([409, 409]);
+    expect(await handle.json()).toHaveProperty('error', expect.stringContaining('handle'));
+    expect(await id.json()).toHaveProperty('error', expect.stringContaining('id'));
+  });
+
+  it('preselects the author a page belongs to, by its publisher', async () => {
+    const cookie = await signIn();
+    const page = await addAsset(cookie);
+    const author = await addAuthor(cookie, { publisher: page.publisher });
+
+    const lookup = await app.request('/api/metadata', json({ url: PAGE_URL }, cookie));
+    const body = await lookup.json() as { metadata: { authorId: number | null } };
+
+    expect(body.metadata.authorId).toBe(author.id);
+  });
+
+  it('attaches every prize published under a publisher in one action', async () => {
+    const cookie = await signIn();
+    const page = await addAsset(cookie);
+    const author = await addAuthor(cookie, { publisher: page.publisher });
+
+    const attached = await app.request(`/api/admin/authors/${author.id}/attach`, json({ publisher: page.publisher }, cookie));
+    const body = await attached.json() as { assets: { author: { id: number } | null; id: number }[]; attached: number };
+    const missed = await app.request(`/api/admin/authors/${author.id}/attach`, json({ publisher: 'Nobody at all' }, cookie));
+
+    expect(body.attached).toBe(1);
+    expect(body.assets.find(row => row.id === page.id)?.author?.id).toBe(author.id);
+    expect((await missed.json() as { attached: number }).attached).toBe(0);
+  });
+
+  it('deletes the author only, leaving the prize with no author', async () => {
+    const cookie = await signIn();
+    const author = await addAuthor(cookie);
+    const asset = await addAsset(cookie);
+    await app.request(`/api/admin/assets/${asset.id}`, {
+      body: JSON.stringify({ ...asset, authorId: author.id }),
+      headers: { 'content-type': 'application/json', cookie },
+      method: 'PATCH',
+    });
+
+    const response = await app.request(`/api/admin/authors/${author.id}`, { headers: { cookie }, method: 'DELETE' });
+    const body = await response.json() as { assets: { author: unknown; id: number }[]; unlinked: number };
+
+    expect(body.unlinked).toBe(1);
+    expect(body.assets).toHaveLength(1);
+    expect(body.assets[0].author).toBeNull();
   });
 });
 
@@ -460,13 +575,14 @@ describe('hiding a prize from the public list', () => {
     expect(adminBody.assets.find(row => row.id === asset.id)?.hidden).toBe(true);
   });
 
-  it('puts the prize back with its contact and keys untouched', async () => {
+  it('puts the prize back with its author and keys untouched', async () => {
     const cookie = await signIn();
     const asset = await addAsset(cookie);
-    await app.request(`/api/admin/assets/${asset.id}/contact`, {
-      body: JSON.stringify({ discordHandle: 'someone' }),
+    const author = await addAuthor(cookie);
+    await app.request(`/api/admin/assets/${asset.id}`, {
+      body: JSON.stringify({ ...asset, authorId: author.id }),
       headers: { 'content-type': 'application/json', cookie },
-      method: 'PUT',
+      method: 'PATCH',
     });
     await app.request(`/api/admin/assets/${asset.id}/keys`, json({ keys: 'KEY-1' }, cookie));
 
@@ -478,9 +594,9 @@ describe('hiding a prize from the public list', () => {
     expect(publicBody.totals.count).toBe(1);
 
     const adminBody = await (await app.request('/api/admin/assets', { headers: { cookie } }))
-      .json() as { assets: { contact: unknown; id: number; keys: unknown[] }[] };
+      .json() as { assets: { author: unknown; id: number; keys: unknown[] }[] };
     const row = adminBody.assets.find(candidate => candidate.id === asset.id);
-    expect(row?.contact).not.toBeNull();
+    expect(row?.author).not.toBeNull();
     expect(row?.keys).toHaveLength(1);
   });
 

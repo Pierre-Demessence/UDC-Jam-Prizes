@@ -72,12 +72,21 @@ the socket address. Run typecheck, lint, test and build before considering work 
 
 ## Invariants
 
-- Private data (Discord handles, key values, internal notes, how many keys a prize needs) never leaves
-  the API: public responses are shaped server-side from an explicit field list, so hiding fields in the
-  UI is not the safeguard. `assets.notes` is private too — never hand a whole row to a public payload.
+- Private data (author records — Discord handles and ids, publisher — key values, internal notes, how
+  many keys a prize needs) never leaves the API: public responses are shaped server-side from an
+  explicit field list, so hiding fields in the UI is not the safeguard. `assets.notes` is private too —
+  never hand a whole row to a public payload.
 - `assets.hidden` keeps a prize off the public catalogue: `publicCatalogue` filters it out, totals
-  included, while the admin list keeps it marked "Hidden" with its keys and contact. Editing a prize
+  included, while the admin list keeps it marked "Hidden" with its keys and author. Editing a prize
   through the form never changes the flag; only the table's Hide/Unhide button does.
+- An author is one record shared by their prizes (`authors`, `assets.author_id`), never a field copied
+  onto each. It has no name column: it is labelled by `discordHandle`, then `publisher`
+  (`authorLabel`), and `parseAuthorInput` requires at least one of publisher / handle / id so a row
+  stays findable. `authors.publisher` is the store string a prize matches on: unique among authors,
+  compared case-insensitively by `findAuthorByPublisher`, and the only matching rule — the metadata
+  prefill, the bulk import and the attach endpoint all use it. `author_id` is `ON DELETE SET NULL`, so
+  deleting an author leaves every prize, key and price in place, merely unattached. Both the Discord
+  handle (mutable) and the Discord id (a snowflake, kept as text) are stored for that reason.
 - Key values are ciphertext at rest (`server/secrets.ts`, AES-256-GCM, key from
   `KEY_ENCRYPTION_SECRET`): never write a key with a plain insert, and never compare `key_value` for
   duplicates — encryption is randomised. `keys.key_fingerprint` is what recognises a repeated key, and

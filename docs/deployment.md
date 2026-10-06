@@ -43,7 +43,10 @@ kubectl -n jam-prizes-prod exec deploy/jam-prizes -- ls -l /data               #
 An image goes back by reverting the pin commit in `k8s/prod/deployment.yaml` and pushing it: CI writes
 that tag and ArgoCD syncs the file, so a bare `kubectl rollout undo` would be undone at the next sync.
 The schema does not come back with the image — migrations run forward at every startup
-(`docs/backlog.md`).
+(`docs/backlog.md`). Migration `0008` is the one that rewrites data rather than shapes: it turns every
+`contacts` row into an `authors` row and drops the table, so the first deploy carrying it is worth a
+volume snapshot in hand before the pod starts. `0009` then drops the `authors.name` column, which the
+label no longer needs, and `0010` drops `authors.notes`, which the author no longer carries.
 
 ## Backups and restores
 

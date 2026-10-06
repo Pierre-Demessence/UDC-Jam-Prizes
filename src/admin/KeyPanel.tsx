@@ -31,24 +31,14 @@ function KeyRow({ asset, onChanged, record }: {
   );
 }
 
-/** The author behind a prize, and the keys the author donated. Both private. */
+/**
+ * The keys a prize holds, and who gave them. Both private. The author itself is
+ * edited once, in the Authors panel — here it is only a reminder of who sent
+ * these codes.
+ */
 export function KeyPanel({ asset, onChanged }: { asset: AdminAsset; onChanged: (asset: AdminAsset) => void }) {
-  const [handle, setHandle] = useState(() => asset.contact?.discordHandle ?? '');
-  const [notes, setNotes] = useState(() => asset.contact?.contactNotes ?? '');
   const [pasted, setPasted] = useState('');
   const [message, setMessage] = useState<string | null>(null);
-
-  async function saveContact(): Promise<void> {
-    setMessage(null);
-
-    try {
-      onChanged((await api.saveContact(asset.id, { contactNotes: notes.trim() === '' ? null : notes.trim(), discordHandle: handle.trim() })).asset);
-      setMessage('Contact saved.');
-    }
-    catch (cause) {
-      setMessage(cause instanceof Error ? cause.message : String(cause));
-    }
-  }
 
   async function addKeys(): Promise<void> {
     setMessage(null);
@@ -73,19 +63,11 @@ export function KeyPanel({ asset, onChanged }: { asset: AdminAsset; onChanged: (
 
   return (
     <div className="key-panel">
-      <div className="field-row">
-        <label className="field field-grow">
-          <span>Discord handle (private)</span>
-          <input onChange={event => setHandle(event.target.value)} placeholder="author#1234" value={handle} />
-        </label>
-        <label className="field field-grow">
-          <span>Author notes (private)</span>
-          <input onChange={event => setNotes(event.target.value)} value={notes} />
-        </label>
-        <button className="button-small" disabled={handle.trim() === ''} onClick={() => void saveContact()} type="button">
-          Save contact
-        </button>
-      </div>
+      <p className="hint">
+        {asset.author === null
+          ? 'No author attached. Pick one in the prize form, or add it in the Authors panel.'
+          : `From ${asset.author.label}.`}
+      </p>
 
       <label className="field field-wide">
         <span>Add keys</span>

@@ -1,6 +1,6 @@
 import type { ImportOutcome } from '../server/import-assets.ts';
-import type { AdminAsset, CatalogueTotals, PublicAsset } from '../server/payloads.ts';
-import type { AssetInput, ContactInput } from '../server/validate.ts';
+import type { AdminAsset, AdminAuthor, CatalogueTotals, PublicAsset } from '../server/payloads.ts';
+import type { AssetInput, AuthorInput } from '../server/validate.ts';
 
 export interface Catalogue {
   assets: PublicAsset[];
@@ -108,9 +108,25 @@ export const api = {
     '/api/admin/import',
     json({ urls }, 'POST'),
   ),
-  saveContact: (id: number, input: ContactInput) => request<{ asset: AdminAsset }>(
-    `/api/admin/assets/${id}/contact`,
-    json(input, 'PUT'),
+  /** The authors behind the prizes: one record, shared by every prize they gave. */
+  authors: () => request<{ authors: AdminAuthor[] }>('/api/admin/authors'),
+  /** Links every prize published under a publisher string, in one action. */
+  attachAuthor: (id: number, publisher: string) => request<{ assets: AdminAsset[]; attached: number }>(
+    `/api/admin/authors/${id}/attach`,
+    json({ publisher }, 'POST'),
+  ),
+  createAuthor: (input: AuthorInput) => request<{ author: AdminAuthor }>(
+    '/api/admin/authors',
+    json(input, 'POST'),
+  ),
+  /** Deletes the author only; the prizes come back unlinked, counted. */
+  deleteAuthor: (id: number) => request<{ assets: AdminAsset[]; unlinked: number }>(
+    `/api/admin/authors/${id}`,
+    { method: 'DELETE' },
+  ),
+  updateAuthor: (id: number, input: AuthorInput) => request<{ author: AdminAuthor }>(
+    `/api/admin/authors/${id}`,
+    json(input, 'PATCH'),
   ),
   /** How many keys the winners asked for; the admin table edits it in place. */
   setNeeded: (id: number, needed: number) => request<{ asset: AdminAsset }>(

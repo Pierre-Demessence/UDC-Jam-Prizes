@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 import { AssetForm } from '@/admin/AssetForm';
 import { AssetTable } from '@/admin/AssetTable';
+import { AuthorsPanel } from '@/admin/AuthorsPanel';
 import { BulkImport } from '@/admin/BulkImport';
 import { api } from '@/api';
 
@@ -66,6 +67,7 @@ export function Admin() {
   const [importing, setImporting] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [openPanel, setOpenPanel] = useState<number | null>(null);
+  const [authorsOpen, setAuthorsOpen] = useState(false);
 
   useEffect(() => {
     document.title = `Admin · ${brand.name}`;
@@ -194,6 +196,7 @@ export function Admin() {
                     className="button"
                     onClick={() => {
                       setImporting(false);
+                      setAuthorsOpen(false);
                       setDraft({ editing: null, metadata: null });
                     }}
                     type="button"
@@ -204,16 +207,38 @@ export function Admin() {
                     className="button-quiet"
                     onClick={() => {
                       setDraft(null);
+                      setAuthorsOpen(false);
                       setImporting(current => !current);
                     }}
                     type="button"
                   >
                     Paste several links
                   </button>
+                  <button
+                    className="button-quiet"
+                    onClick={() => {
+                      setDraft(null);
+                      setImporting(false);
+                      setAuthorsOpen(current => !current);
+                    }}
+                    type="button"
+                  >
+                    {authorsOpen ? 'Hide the authors' : 'Authors'}
+                  </button>
                 </div>
               </div>
 
               {importing ? <BulkImport onClose={() => setImporting(false)} onDone={afterImport} /> : null}
+
+              {authorsOpen
+                ? (
+                    <AuthorsPanel
+                      onAssetsChanged={setAssets}
+                      onClose={() => setAuthorsOpen(false)}
+                      onNotice={setNotice}
+                    />
+                  )
+                : null}
 
               {draft === null
                 ? null

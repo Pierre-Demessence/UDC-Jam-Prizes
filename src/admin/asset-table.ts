@@ -1,12 +1,12 @@
 import { formatCategory } from '@/format';
 import { compareOptional } from '@/sort';
 
-import type { AdminAsset } from '../../server/payloads.ts';
+import type { AdminAsset, AdminAuthor } from '../../server/payloads.ts';
 
 /** The admin table's columns and how each one orders the rows. */
 
 export type SortDirection = 'ascending' | 'descending';
-export type SortKey = 'author' | 'category' | 'contact' | 'keys' | 'name' | 'needed' | 'price';
+export type SortKey = 'author' | 'category' | 'keys' | 'name' | 'needed' | 'price' | 'publisher';
 
 export interface Sort {
   direction: SortDirection;
@@ -26,13 +26,13 @@ export const DEFAULT_SORT: Sort = { direction: 'ascending', key: 'name' };
 
 export const COLUMNS: Column[] = [
   { key: 'name', label: 'Prize', title: 'The asset name, read from the Asset Store page.' },
-  { key: 'author', label: 'Author', title: 'The publisher on the store page. The person who donated it is the contact beside it.' },
+  { key: 'publisher', label: 'Publisher', title: 'The publisher name on the store page, which is what ties the prize to its author.' },
   { key: 'category', label: 'Category', title: 'Read from the address of the store page.' },
   { alignEnd: true, key: 'price', label: 'Price', title: 'What the asset costs, read from the page and editable.' },
-  { alignEnd: true, key: 'keys', label: 'Keys', title: 'How many keys are stored for this prize, and where each one went.' },
+  { alignEnd: true, key: 'keys', label: 'Keys', title: 'How many keys are stored for this prize.' },
   { alignEnd: true, key: 'needed', label: 'Needed', title: 'How many keys the winners asked for. Zero means nobody asked, and the row stays plain.' },
-  { key: 'contact', label: 'Contact', title: 'Discord handle of the person who donated the prize. Private.' },
-  { key: null, label: 'Actions', title: 'Edit the prize, open its keys and contact, or delete it.' },
+  { key: 'author', label: 'Author', title: 'The person who donated the prize. Private.' },
+  { key: null, label: 'Actions', title: 'Edit the prize, open its keys, or delete it.' },
 ];
 
 /** Clicking the sorted column again turns it around; another column starts ascending. */
@@ -86,6 +86,24 @@ export function keySummary(asset: AdminAsset): string {
   return count === 0 ? 'No keys stored yet.' : `${count} ${count === 1 ? 'key' : 'keys'} stored.`;
 }
 
+/**
+ * The author's other fields: the label is already the handle or the publisher, so
+ * repeating the one it stands for would say nothing.
+ */
+export function authorExtras(author: AdminAuthor): string[] {
+  return [author.publisher, author.discordHandle, author.discordId]
+    .filter((value): value is string => value !== null && value !== author.label);
+}
+
+/** The publisher, handle and id behind the author cell's label, for its tooltip. */
+export function authorSummary(author: AdminAuthor): string {
+  const extras = authorExtras(author);
+
+  return extras.length === 0
+    ? 'Private: the author record never reaches the public list.'
+    : `Private: the author record never reaches the public list. ${extras.join(' · ')}`;
+}
+
 /** A copy, sorted; the caller's array is left alone. */
 export function sortAssets(assets: AdminAsset[], sort: Sort): AdminAsset[] {
   const direction = sort.direction === 'ascending' ? 1 : -1;
@@ -95,11 +113,11 @@ export function sortAssets(assets: AdminAsset[], sort: Sort): AdminAsset[] {
   return [...assets].sort((left, right) => {
     switch (sort.key) {
       case 'author':
-        return compareOptional(left.publisher, right.publisher, text, direction) || byName(left, right);
+        return compareOptional(left.author?.label ?? null, right.author?.label ?? null, text, direction) || byName(left, right);
       case 'category':
         return compareOptional(formatCategory(left.category), formatCategory(right.category), text, direction) || byName(left, right);
-      case 'contact':
-        return compareOptional(left.contact?.discordHandle ?? null, right.contact?.discordHandle ?? null, text, direction) || byName(left, right);
+      case 'publisher':
+        return compareOptional(left.publisher, right.publisher, text, direction) || byName(left, right);
       case 'keys':
         return direction * (left.keys.length - right.keys.length) || byName(left, right);
       case 'needed':

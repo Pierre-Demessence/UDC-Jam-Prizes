@@ -2,7 +2,7 @@
 
 Prize catalogue for UDC game jams, replacing the two Google Spreadsheets: a private admin to
 maintain the donated Unity assets, and a public read-only page to browse them. Private fields —
-Discord handles, key values, internal notes — never reach the public side.
+Discord handles and ids, key values, internal notes — never reach the public side.
 
 Scaffolded with [create-corniflex](https://github.com/Pierre-Demessence/create-corniflex).
 
@@ -48,13 +48,18 @@ client and the API, which is what a deployment would run.
   search box, a category filter, sorting and a totals line. No login, and no private field is ever
   sent to the browser.
 - **Admin** (`/admin`) — sign in with `ADMIN_PASSWORD`, paste an Asset Store URL and have the name,
-  image, publisher, category, price and Unity id filled in from the page, keep the author's Discord
-  handle and internal notes, and paste the keys the author sends — the count is what the row reports,
-  and the *Needed* field says how many you asked for.
-  The prize list is a table — every column sorts, and each row opens its own keys and contact. Type how
+  image, publisher, category, price and Unity id filled in from the page, attach the author, and keep
+  internal notes; paste the keys the author sends — the count is what the row reports, and the *Needed*
+  field says how many you asked for.
+  Authors are a list of their own (*Authors* in the toolbar): one record per person with their store
+  publisher, Discord handle and Discord id, shared by every prize they donated, shown by their handle
+  and by their publisher when the handle is not known yet. A prize whose publisher already belongs to
+  an author picks it up by itself, and *Attach every matching prize* links a whole back catalogue in
+  one click.
+  The prize list is a table — every column sorts, and each row opens its own keys. Type how
   many keys a prize needs and the row says whether they have arrived: plain when nothing was asked for,
   marked up while the request is unfilled, and marked up differently once it is filled.
-  Hiding a prize takes it off the public page — its keys and contact stay here — and the same button
+  Hiding a prize takes it off the public page — its keys and author stay here — and the same button
   shows it again.
   *Paste several links* adds a whole batch at once (up to 20, read a few at a time), reporting per
   link whether it was added, already there, or unreadable. Key values are encrypted on the way in and

@@ -57,6 +57,27 @@
       "when": 1791241820161,
       "tag": "0007_curved_elektra",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1791244182610,
+      "tag": "0008_curvy_spyke",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1791247898825,
+      "tag": "0009_mean_robin_chapel",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1791249687459,
+      "tag": "0010_zippy_white_tiger",
+      "breakpoints": true
     }
   ]
 }

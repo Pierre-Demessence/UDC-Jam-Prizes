@@ -2,7 +2,7 @@ import { Fragment, useState } from 'react';
 
 import type { KeyNeed, Sort, SortKey } from '@/admin/asset-table';
 
-import { COLUMNS, DEFAULT_SORT, keyNeed, keySummary, needClass, needLabel, nextSort, sortAssets } from '@/admin/asset-table';
+import { authorSummary, COLUMNS, DEFAULT_SORT, keyNeed, keySummary, needClass, needLabel, nextSort, sortAssets } from '@/admin/asset-table';
 import { KeyPanel } from '@/admin/KeyPanel';
 import { formatCategory, formatPrice } from '@/format';
 
@@ -79,9 +79,9 @@ function numberOrFallback(text: string, fallback: number): number {
 }
 
 /**
- * The prize list as a table: denser than cards, and every column sorts. The key
- * list and the contact fields stay behind the row's own panel — a status select
- * per key does not belong in a cell.
+ * The prize list as a table: denser than cards, and every column sorts. The keys
+ * stay behind the row's own panel — a status select per key does not belong in a
+ * cell.
  */
 export function AssetTable({
   assets,
@@ -157,8 +157,7 @@ export function AssetTable({
 
   return (
     <div className="table-scroll">
-      <table className="admin-table">
-        <caption className="table-caption">Prizes in the jam</caption>
+      <table aria-label="Prizes in the jam" className="admin-table">
         <thead>
           <tr>
             {COLUMNS.map(column => column.key === null
@@ -205,9 +204,9 @@ export function AssetTable({
                     />
                   </td>
                   <td>
-                    {asset.contact === null
-                      ? <span className="muted" title="No Discord handle recorded for this author yet.">—</span>
-                      : <span title="Private: this never reaches the public list.">{asset.contact.discordHandle}</span>}
+                    {asset.author === null
+                      ? <span className="muted" title="No author attached to this prize yet.">—</span>
+                      : <span title={authorSummary(asset.author)}>{asset.author.label}</span>}
                   </td>
                   <td className="cell-actions">
                     {confirmingId === asset.id
@@ -238,7 +237,7 @@ export function AssetTable({
                               aria-expanded={openKeys === asset.id}
                               className="button-small"
                               onClick={() => onToggleKeys(asset.id)}
-                              title="The author's Discord handle, notes, and the keys the author donated."
+                              title="The keys stored for this prize."
                               type="button"
                             >
                               Keys

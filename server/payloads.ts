@@ -6,7 +6,7 @@
  * leak it by accident. `assets.notes`, Discord handles and key values are the
  * private fields this protects.
  */
-import type { Asset, Contact, Key } from './schema.ts';
+import type { Asset, Author, Key } from './schema.ts';
 
 import { decryptSecret } from './secrets.ts';
 
@@ -37,13 +37,29 @@ export interface AdminKey {
   keyValue: string;
 }
 
-export interface AdminContact {
-  contactNotes: string | null;
-  discordHandle: string;
+/**
+ * The person behind one or more prizes. Private, like the contact it replaces:
+ * no author field is ever published.
+ */
+export interface AdminAuthor {
+  id: number;
+  /** How many prizes hang off this author, so a delete can say what it unlinks. */
+  assetCount: number;
+  /**
+   * How the author is named on screen: the Discord handle, then the store
+   * publisher. Derived, so there is no name to keep in step with either.
+   */
+  discordHandle: string | null;
+  label: string;
+  /** The snowflake, kept as text: an identifier, never a number. */
+  discordId: string | null;
+  /** The store publisher string prizes match on, or null when it is not known. */
+  publisher: string | null;
 }
 
 export interface AdminAsset extends PublicAsset {
-  contact: AdminContact | null;
+  /** The donor, or null when no author has been attached yet. */
+  author: AdminAuthor | null;
   createdAt: string;
   /** Hidden from the public catalogue, but still listed here. */
   hidden: boolean;
@@ -81,10 +97,29 @@ export function toPublicAsset(asset: Asset): PublicAsset {
   };
 }
 
-export function toAdminAsset(asset: Asset, contact: Contact | null, keys: Key[], secret: string): AdminAsset {
+/**
+ * How an author is named on screen: the Discord handle, then the store
+ * publisher, then the id for a record that somehow has neither.
+ */
+export function authorLabel(author: Author): string {
+  return author.discordHandle ?? author.publisher ?? `Author #${author.id}`;
+}
+
+export function toAdminAuthor(author: Author, assetCount: number): AdminAuthor {
+  return {
+    id: author.id,
+    assetCount,
+    discordHandle: author.discordHandle,
+    discordId: author.discordId,
+    label: authorLabel(author),
+    publisher: author.publisher,
+  };
+}
+
+export function toAdminAsset(asset: Asset, author: AdminAuthor | null, keys: Key[], secret: string): AdminAsset {
   return {
     ...toPublicAsset(asset),
-    contact: contact === null ? null : { contactNotes: contact.contactNotes, discordHandle: contact.discordHandle },
+    author,
     createdAt: asset.createdAt.toISOString(),
     hidden: asset.hidden,
     needed: asset.needed,
