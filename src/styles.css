@@ -625,6 +625,13 @@ button:disabled {
   width: 1%;
 }
 
+/* A sliver of air between the buttons in a row: butted together they read as one
+   control. The cell's own buttons only — the delete confirmation is a wrapper
+   whose gap is wider already. */
+.admin-table .cell-actions>button+button {
+  margin-left: 4px;
+}
+
 .row-keys th,
 .row-keys td {
   padding: 0 12px 14px;
