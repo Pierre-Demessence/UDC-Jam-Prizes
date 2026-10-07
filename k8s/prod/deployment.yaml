@@ -38,7 +38,7 @@ spec:
       containers:
         - name: app
           # Pinned to the built commit's tag by .github/workflows/deploy.yml.
-          image: ghcr.io/pierre-demessence/udc-jam-prizes:c071cdd
+          image: ghcr.io/pierre-demessence/udc-jam-prizes:5fcba45
           imagePullPolicy: Always
           ports:
             - name: http
