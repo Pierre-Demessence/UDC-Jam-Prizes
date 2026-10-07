@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { categoriesOf, DEFAULT_FILTERS, filterAssets } from '@/catalogue';
+import { DEFAULT_FILTERS, filterAssets } from '@/catalogue';
 
 import type { PublicAsset } from '../server/payloads.ts';
 
@@ -25,12 +25,6 @@ const catalogue: PublicAsset[] = [
   asset({ name: 'Cherry Kit', assetId: '3', category: '2d', priceCents: null, publisher: 'Someone Else' }),
 ];
 
-describe('categoriesOf', () => {
-  it('lists each category once, in order', () => {
-    expect(categoriesOf(catalogue)).toEqual(['2d', 'tools/gui']);
-  });
-});
-
 describe('filterAssets', () => {
   it('searches names, publishers and categories', () => {
     expect(filterAssets(catalogue, { ...DEFAULT_FILTERS, query: 'febucci' }).map(a => a.name)).toEqual(['Bee UI']);
@@ -40,6 +34,11 @@ describe('filterAssets', () => {
 
   it('narrows to one category', () => {
     expect(filterAssets(catalogue, { ...DEFAULT_FILTERS, category: '2d' }).map(a => a.name)).toEqual(['Apple Kit', 'Cherry Kit']);
+  });
+
+  it('includes the categories below the picked one', () => {
+    expect(filterAssets(catalogue, { ...DEFAULT_FILTERS, category: 'tools' }).map(a => a.name)).toEqual(['Bee UI']);
+    expect(filterAssets(catalogue, { ...DEFAULT_FILTERS, category: 'tools/gui' }).map(a => a.name)).toEqual(['Bee UI']);
   });
 
   it('ignores case and surrounding spaces in the query', () => {
@@ -52,7 +51,7 @@ describe('filterAssets', () => {
 });
 
 describe('sorting', () => {
-  const alsoUnknownAuthor = [
+  const alsoUnknownPublisher = [
     ...catalogue,
     asset({ id: 4, name: 'Zebra Kit', assetId: '4', publisher: null }),
   ];
@@ -61,24 +60,24 @@ describe('sorting', () => {
     expect(filterAssets(catalogue, DEFAULT_FILTERS).map(a => a.name)).toEqual(['Apple Kit', 'Bee UI', 'Cherry Kit']);
   });
 
-  it('sorts by author, and leaves an unknown author for last', () => {
-    expect(filterAssets(alsoUnknownAuthor, { ...DEFAULT_FILTERS, sort: 'author' }).map(a => a.name))
+  it('sorts by publisher, and leaves an unknown publisher for last', () => {
+    expect(filterAssets(alsoUnknownPublisher, { ...DEFAULT_FILTERS, sort: 'publisher' }).map(a => a.name))
       .toEqual(['Bee UI', 'Apple Kit', 'Cherry Kit', 'Zebra Kit']);
   });
 
-  it('breaks a tie on the author by name', () => {
-    const twoBySameAuthor = [
+  it('breaks a tie on the publisher by name', () => {
+    const twoBySamePublisher = [
       asset({ id: 1, name: 'Second', assetId: '1', publisher: 'Someone' }),
       asset({ id: 2, name: 'First', assetId: '2', publisher: 'Someone' }),
     ];
 
-    expect(filterAssets(twoBySameAuthor, { ...DEFAULT_FILTERS, sort: 'author' }).map(a => a.name))
+    expect(filterAssets(twoBySamePublisher, { ...DEFAULT_FILTERS, sort: 'publisher' }).map(a => a.name))
       .toEqual(['First', 'Second']);
   });
 
   it('does not mutate the list it was given', () => {
     const input = [...catalogue];
-    filterAssets(input, { ...DEFAULT_FILTERS, sort: 'author' });
+    filterAssets(input, { ...DEFAULT_FILTERS, sort: 'publisher' });
 
     expect(input.map(a => a.name)).toEqual(['Bee UI', 'Apple Kit', 'Cherry Kit']);
   });

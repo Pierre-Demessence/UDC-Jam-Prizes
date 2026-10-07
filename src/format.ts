@@ -14,18 +14,8 @@ export function formatPrice(priceCents: number | null): string {
   return new Intl.NumberFormat(LOCALE, { currency: CURRENCY, style: 'currency' }).format(priceCents / 100);
 }
 
-export function formatAssetCount(count: number): string {
-  return count === 1 ? '1 asset' : `${count} assets`;
-}
-
-/** Total is a sum of prices; unknown prices simply do not contribute. */
-export function describeTotals(totals: { count: number; priceCents: number }): string {
-  return `${formatAssetCount(totals.count)} · ${formatPrice(totals.priceCents)} in total`;
-}
-
-export function totalsTooltip(totals: { count: number; priceCents: number }): string {
-  return `${formatAssetCount(totals.count)} listed, adding up to ${formatPrice(totals.priceCents)}. `
-    + 'Assets without a known price add nothing to the total.';
+export function formatPrizeCount(count: number): string {
+  return count === 1 ? '1 prize' : `${count} prizes`;
 }
 
 const ACRONYMS = new Set(['2d', '3d', 'ai', 'ar', 'gui', 'ui', 'vfx', 'vr', 'xr']);

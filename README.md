@@ -45,8 +45,8 @@ client and the API, which is what a deployment would run.
 ## What it does
 
 - **Public page** (`/`) — every donated asset with its image, publisher (linked to their store page
-  when it is known), category and price, plus a search box, a category filter, sorting and a totals
-  line. No login, and no private field is ever sent to the browser.
+  when it is known), category and price, plus a search box, a category tree (any depth), sorting by name or
+  publisher and a light, dark or system theme. No login, and no private field is ever sent to the browser.
 - **Admin** (`/admin`) — sign in with `ADMIN_PASSWORD`, paste an Asset Store URL and have the name,
   image, publisher and their store page id, category, price and the asset's Unity id filled in from the
   page. The publisher becomes an author — created from the page when the list does not know it — so the

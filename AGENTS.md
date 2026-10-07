@@ -30,8 +30,12 @@ the socket address. Run typecheck, lint, test and build before considering work 
 
 - `src/` — the React client; `main.tsx` mounts `<App>` into `#app`. `App.tsx` switches between the
   public gallery (`src/gallery/`) and the admin (`src/admin/`); API calls live in `src/api.ts`, and
-  the testable logic in `src/catalogue.ts`, `src/format.ts`, `src/sort.ts`, and
+  the testable logic in `src/catalogue.ts`, `src/category-tree.ts`, `src/format.ts`, `src/sort.ts`, and
   `src/admin/asset-table.ts` and `src/admin/author-table.ts` (each admin table's columns and sorting).
+- `src/gallery/` — the public page. Its palette and layout are in `gallery.css`; `theme.ts` puts the chosen
+  theme on `<html data-theme>` while the gallery is mounted, which is what keeps the admin on its own
+  dark palette. Fonts (Geist, Geist Mono) are self-hosted in `src/assets/fonts/`: the CSP allows `'self'`
+  only, so a font CDN would be blocked.
 - `server/` — the API; `index.ts` (server + static `dist/`), `app.ts` (routes), `db.ts` (SQLite),
   `schema.ts` (the Drizzle tables), `repository.ts` (queries), `payloads.ts` (public and admin
   response shapes), `validate.ts` (input rules), `auth.ts` (session cookie + rate limits),

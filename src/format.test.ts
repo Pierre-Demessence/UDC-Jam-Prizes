@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { describeTotals, formatAssetCount, formatCategory, formatPrice, publisherPageUrl, totalsTooltip } from '@/format';
+import { formatCategory, formatPrice, formatPrizeCount, publisherPageUrl } from '@/format';
 
 describe('formatPrice', () => {
   it('renders cents as a currency amount', () => {
@@ -16,20 +16,14 @@ describe('formatPrice', () => {
   });
 });
 
-describe('the totals line', () => {
-  it('counts and sums', () => {
-    expect(describeTotals({ count: 3, priceCents: 9750 })).toBe('3 assets · $97.50 in total');
+describe('formatPrizeCount', () => {
+  it('counts prizes', () => {
+    expect(formatPrizeCount(3)).toBe('3 prizes');
+    expect(formatPrizeCount(0)).toBe('0 prizes');
   });
 
-  it('reads naturally for a single asset', () => {
-    expect(formatAssetCount(1)).toBe('1 asset');
-  });
-
-  it('explains what the numbers are, for the tooltip', () => {
-    const tooltip = totalsTooltip({ count: 2, priceCents: 1000 });
-
-    expect(tooltip).toContain('$10.00');
-    expect(tooltip).toContain('without a known price');
+  it('reads naturally for a single prize', () => {
+    expect(formatPrizeCount(1)).toBe('1 prize');
   });
 });
 

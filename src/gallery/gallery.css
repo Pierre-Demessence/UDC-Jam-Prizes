@@ -1,0 +1,743 @@
+/* The public gallery. It carries its own light and dark palette: useTheme() puts
+   data-theme on <html> while the gallery is mounted, so these tokens replace the
+   admin's dark ones there and nowhere else. Colour is never the only signal —
+   a picked category is also bold, filled and checked. */
+
+@font-face {
+  font-family: "Geist";
+  src: url("../assets/fonts/geist-latin-wght-normal.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Geist Mono";
+  src: url("../assets/fonts/geist-mono-latin-wght-normal.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+/* Tokens: light-dark() picks by the used colour-scheme, which is the chosen
+   theme, or the system's when the theme is "system". */
+
+:root[data-theme] {
+  --bg: light-dark(#f6f6f4, #101114);
+  --surface: light-dark(#fff, #181a1e);
+  --surface-2: light-dark(#ecedef, #1e2025);
+  --border: light-dark(#dcdfe3, #2a2d33);
+  --border-strong: light-dark(#b9bec6, #454a52);
+  --text: light-dark(#14171c, #eceef1);
+  --text-soft: light-dark(#4b515b, #b6bbc3);
+  --text-muted: light-dark(#5d636d, #9298a2);
+  --accent: light-dark(#1f4fe0, #8aa6ff);
+  --placeholder: light-dark(#6b717b, #8a909a);
+  --selected: light-dark(#e3e7f5, #242b44);
+  --track: light-dark(#ecedef, #1b1d22);
+  --on: light-dark(#14171c, #eceef1);
+  --on-ink: light-dark(#fff, #101114);
+  --media-bg: light-dark(#e3e5e8, #1b1d22);
+  --media-line: light-dark(rgb(20 23 28 / 12%), rgb(255 255 255 / 12%));
+  --tag-bg: light-dark(rgb(255 255 255 / 95%), rgb(16 17 20 / 90%));
+  --tag-ink: light-dark(#14171c, #eceef1);
+  --tag-line: light-dark(rgb(20 23 28 / 28%), rgb(255 255 255 / 32%));
+}
+
+:root[data-theme] {
+  /* Keeps the page from jumping sideways when a short result list drops the scrollbar. */
+  scrollbar-gutter: stable;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+}
+
+:root[data-theme="system"] {
+  color-scheme: light dark;
+}
+
+/* Page */
+
+.gallery {
+  min-height: 100vh;
+  font-family: "Geist", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.gallery-inner {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 32px;
+}
+
+.gallery-header {
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+  padding: 24px 0 40px;
+  border-bottom: 1px solid var(--border);
+}
+
+.gallery-header h1 {
+  margin: 0;
+  font-size: 3rem;
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+
+.gallery-topbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.gallery-eyebrow,
+.aside-heading {
+  margin: 0;
+  font: 500 0.75rem "Geist Mono", ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.gallery-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 48px;
+  padding: 36px 0 80px;
+}
+
+.gallery .notice {
+  margin-top: 24px;
+}
+
+/* Segmented controls: the theme selector and the sort toggle */
+
+.segmented {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  background: var(--track);
+  border-radius: 11px;
+}
+
+.segment {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-soft);
+  font: 500 0.8125rem "Geist", system-ui, sans-serif;
+  cursor: pointer;
+}
+
+.segment:hover {
+  color: var(--text);
+}
+
+.segment[aria-pressed="true"] {
+  background: var(--on);
+  color: var(--on-ink);
+}
+
+/* Sidebar */
+
+.gallery-aside {
+  position: sticky;
+  top: 24px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  display: flex;
+  flex: 0 0 248px;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.aside-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.aside-heading {
+  padding-inline-start: 4px;
+}
+
+.tree ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tree>ul {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  border-radius: 8px;
+}
+
+.tree-row:hover {
+  background: var(--surface-2);
+}
+
+.tree-row.is-selected {
+  background: var(--selected);
+}
+
+.tree-toggle,
+.tree-spacer {
+  flex: none;
+  width: 26px;
+  height: 34px;
+}
+
+.tree-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.tree-toggle:hover {
+  color: var(--text);
+}
+
+.tree-toggle svg {
+  transition: transform 140ms ease;
+}
+
+.tree-toggle[aria-expanded="true"] svg {
+  transform: rotate(90deg);
+}
+
+.tree-pick {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  height: 34px;
+  padding: 0 10px 0 4px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font: 400 0.875rem "Geist", system-ui, sans-serif;
+  text-align: left;
+  cursor: pointer;
+}
+
+.is-selected .tree-pick {
+  font-weight: 600;
+}
+
+.tree-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tree-meta svg {
+  color: var(--accent);
+}
+
+.tree-count {
+  font: 400 0.75rem "Geist Mono", ui-monospace, monospace;
+  color: var(--text-muted);
+}
+
+.sponsor {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.sponsor h2 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.sponsor p {
+  margin: 0;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: var(--text-soft);
+}
+
+.sponsor-contact {
+  font: 500 0.84rem "Geist Mono", ui-monospace, monospace;
+  color: var(--text);
+}
+
+/* Main column: search, category (narrow screens), sort, results, grid */
+
+.gallery-main {
+  display: grid;
+  flex: 1;
+  grid-template-areas:
+    "search search"
+    "results sort"
+    "grid grid"
+    "foot foot";
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  min-width: 0;
+}
+
+.gallery-toolbar {
+  display: contents;
+}
+
+.search {
+  position: relative;
+  display: block;
+  grid-area: search;
+}
+
+.search-icon {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 16px;
+  display: flex;
+  align-items: center;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.search input {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px 0 44px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  font: 400 0.9375rem "Geist", system-ui, sans-serif;
+}
+
+.search input:hover {
+  border-color: var(--border-strong);
+}
+
+.search input::placeholder {
+  color: var(--placeholder);
+}
+
+.category-button {
+  display: none;
+}
+
+.sort {
+  display: flex;
+  grid-area: sort;
+  align-items: center;
+  gap: 10px;
+}
+
+.sort-label {
+  font: 500 0.8125rem "Geist", system-ui, sans-serif;
+  color: var(--text-muted);
+}
+
+.sort-select {
+  display: none;
+}
+
+.results {
+  display: flex;
+  grid-area: results;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  margin: 0;
+}
+
+.results-category {
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.results-count {
+  font: 400 0.8125rem "Geist Mono", ui-monospace, monospace;
+  color: var(--text-muted);
+}
+
+.gallery-main>.notice,
+.prize-grid {
+  grid-area: grid;
+}
+
+.prize-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 36px 24px;
+  margin-top: 8px;
+}
+
+.gallery-footnote {
+  grid-area: foot;
+  margin: 24px 0 0;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+/* Prize card: the image leads, the rest is quiet */
+
+.prize {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.prize-media {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  overflow: hidden;
+  border: 1px solid var(--media-line);
+  border-radius: 12px;
+  background: var(--media-bg);
+}
+
+.prize-media a {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+.prize-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 350ms ease;
+}
+
+.prize:hover .prize-media img {
+  transform: scale(1.04);
+}
+
+.prize-media-empty {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+/* Bordered and near-opaque, so it reads over a white image in the dark theme and a black one in the light. */
+.prize-price {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  padding: 3px 8px;
+  border: 1px solid var(--tag-line);
+  border-radius: 6px;
+  background: var(--tag-bg);
+  color: var(--tag-ink);
+  font: 500 0.78rem "Geist Mono", ui-monospace, monospace;
+}
+
+.prize-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 0 2px;
+  min-width: 0;
+}
+
+.prize-text p {
+  margin: 0;
+}
+
+.prize-title {
+  margin: 0;
+  font-size: 1.03rem;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.005em;
+}
+
+.prize-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.prize-title a:hover {
+  text-decoration: underline;
+}
+
+.prize-publisher {
+  font-size: 0.875rem;
+  color: var(--text-soft);
+}
+
+.prize-publisher a {
+  color: inherit;
+}
+
+.prize-category {
+  min-height: 1rem;
+  overflow: hidden;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Category dialog (narrow screens) */
+
+.category-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: none;
+  height: 100%;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: var(--surface);
+  color: var(--text);
+  font-family: "Geist", system-ui, sans-serif;
+}
+
+.category-dialog-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 8px 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.category-dialog-header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.category-dialog-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.category-dialog .tree-row {
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+}
+
+.category-dialog .tree-toggle,
+.category-dialog .tree-spacer {
+  width: 48px;
+  height: 54px;
+}
+
+.category-dialog .tree-pick {
+  height: 54px;
+  padding-inline-end: 16px;
+  font-size: 1rem;
+}
+
+/* Wide screens */
+
+@media (min-width: 721px) {
+  .gallery-header h1 {
+    font-size: 4rem;
+  }
+}
+
+/* Narrow screens: the tree moves into a dialog, the toolbar sticks, the grid is two across */
+
+@media (max-width: 720px) {
+  .gallery-inner {
+    padding: 0 16px;
+  }
+
+  .gallery-header {
+    gap: 28px;
+    padding: 12px 0 28px;
+    border-bottom: 0;
+  }
+
+  .segment {
+    width: 42px;
+    height: 38px;
+    padding: 0;
+  }
+
+  .segment-text {
+    display: none;
+  }
+
+  .gallery-body {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+    padding: 0 0 32px;
+  }
+
+  .gallery-aside {
+    position: static;
+    flex: none;
+    order: 2;
+    padding-top: 24px;
+  }
+
+  .aside-tree {
+    display: none;
+  }
+
+  .gallery-main {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    order: 1;
+  }
+
+  .gallery-toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-inline: -16px;
+    padding: 12px 16px;
+    border-block: 1px solid var(--border);
+    background: var(--bg);
+  }
+
+  .search {
+    flex: 1 1 100%;
+  }
+
+  .search input {
+    height: 46px;
+  }
+
+  .category-button,
+  .sort-select {
+    height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    color: var(--text);
+    font: 500 0.875rem "Geist", system-ui, sans-serif;
+  }
+
+  .category-button {
+    display: inline-flex;
+    flex: 1;
+    min-width: 0;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    text-align: left;
+    cursor: pointer;
+  }
+
+  .category-button svg {
+    flex: none;
+    color: var(--text-muted);
+  }
+
+  .category-button-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .sort {
+    flex: none;
+  }
+
+  .sort-label,
+  .sort-toggle {
+    display: none;
+  }
+
+  .sort-select {
+    display: block;
+    width: auto;
+  }
+
+  .results {
+    font-size: 0.8rem;
+  }
+
+  .results-category {
+    display: none;
+  }
+
+  .prize-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 14px;
+  }
+
+  .prize-media {
+    border-radius: 10px;
+  }
+
+  .prize-price {
+    bottom: 8px;
+    left: 8px;
+    padding: 2px 7px;
+    font-size: 0.75rem;
+  }
+
+  .prize-title {
+    font-size: 0.9rem;
+  }
+
+  .prize-publisher {
+    font-size: 0.8125rem;
+  }
+
+  .prize-category {
+    font-size: 0.75rem;
+  }
+}
